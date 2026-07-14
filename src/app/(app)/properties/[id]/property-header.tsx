@@ -18,11 +18,11 @@ import { PropertyFormDialog, type PropertyFormValues } from "../property-form";
 
 export function PropertyHeader({
   detail,
-  isAdmin,
+  canEdit,
   owners,
 }: {
   detail: PropertyDetail;
-  isAdmin: boolean;
+  canEdit: boolean;
   owners: Array<{ id: string; name: string }>;
 }) {
   const { property } = detail;
@@ -115,7 +115,7 @@ export function PropertyHeader({
                 Open in Google Maps
               </a>
             </Button>
-            {isAdmin && (
+            {canEdit && (
               <Button
                 size="sm"
                 variant="outline"
@@ -130,7 +130,7 @@ export function PropertyHeader({
         </div>
       </div>
 
-      {isAdmin && (
+      {canEdit && (
         <PropertyFormDialog
           open={editOpen}
           onOpenChange={setEditOpen}

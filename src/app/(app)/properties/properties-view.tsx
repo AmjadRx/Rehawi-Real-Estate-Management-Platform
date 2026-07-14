@@ -52,14 +52,14 @@ export function PropertiesView({
   items,
   baseCurrency,
   countries,
+  cities,
   owners,
-  isAdmin,
 }: {
   items: Item[];
   baseCurrency: string;
   countries: string[];
+  cities: string[];
   owners: Array<{ id: string; name: string }>;
-  isAdmin: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,12 +113,10 @@ export function PropertiesView({
             portfolio
           </p>
         </div>
-        {isAdmin && (
-          <Button onClick={() => setAddOpen(true)} className="gap-2">
-            <Plus className="size-4" aria-hidden />
-            Add property
-          </Button>
-        )}
+        <Button onClick={() => setAddOpen(true)} className="gap-2">
+          <Plus className="size-4" aria-hidden />
+          Add property
+        </Button>
       </FadeIn>
 
       <FadeIn delay={0.05} className="space-y-3">
@@ -160,6 +158,11 @@ export function PropertiesView({
             countries.map((c) => [c, c]),
           )}
           {filterSelect(
+            "city",
+            "City",
+            cities.map((c) => [c, c]),
+          )}
+          {filterSelect(
             "occupancy",
             "Occupancy",
             Object.entries(OCCUPANCY_LABEL).filter(([v]) => v !== "n/a"),
@@ -169,6 +172,13 @@ export function PropertiesView({
             "Owner",
             [["family", "Family (all)"], ...owners.map((o) => [o.id, o.name] as [string, string])],
           )}
+          {filterSelect("sort", "Sort", [
+            ["name", "Name"],
+            ["location", "Location"],
+            ["date", "Date added"],
+            ["price", "Purchase price"],
+            ["income", "Monthly income"],
+          ])}
         </div>
       </FadeIn>
 
@@ -181,7 +191,7 @@ export function PropertiesView({
           <div>
             <p className="font-medium">No properties match</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Try clearing a filter{isAdmin ? " or add your first property" : ""}.
+              Try clearing a filter or add your first property.
             </p>
           </div>
         </FadeIn>
@@ -195,13 +205,11 @@ export function PropertiesView({
         </Stagger>
       )}
 
-      {isAdmin && (
-        <PropertyFormDialog
-          open={addOpen}
-          onOpenChange={setAddOpen}
-          owners={owners}
-        />
-      )}
+      <PropertyFormDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        owners={owners}
+      />
     </div>
   );
 }

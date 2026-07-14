@@ -13,6 +13,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/auth/request-otp",
   "/api/auth/verify-otp",
+  "/api/auth/login",
   "/api/auth/logout",
   "/api/health",
   "/manifest.webmanifest",
@@ -23,6 +24,21 @@ const PUBLIC_PATHS = [
 ];
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * §7 v2 self-service: viewers may edit their own profile, create
+ * properties, and mutate data they created. Ownership is enforced by the
+ * routes themselves; the middleware only opens these path prefixes.
+ */
+function viewerMayMutate(method: string, pathname: string): boolean {
+  if (pathname === "/api/v1/me" && method === "PATCH") return true;
+  if (pathname === "/api/auth/set-password" && method === "POST") return true;
+  if (pathname.startsWith("/api/v1/properties")) return true;
+  if (pathname === "/api/v1/uploads" && method === "POST") return true;
+  if (pathname === "/api/v1/extract" && method === "POST") return true;
+  if (pathname.startsWith("/api/v1/files/")) return true;
+  return false;
+}
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some(
@@ -71,14 +87,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  // Viewer role (§3.3): reject any mutating method outside /api/auth/*
+  // Viewer role (§3.3, v2 self-service): mutations are admin-only except
+  // own-profile edits, property creation, and writes to data they created
+  // (ownership checks live in the routes).
   if (
     session.role !== "admin" &&
     isApi &&
-    MUTATING_METHODS.has(request.method)
+    MUTATING_METHODS.has(request.method) &&
+    !viewerMayMutate(request.method, pathname)
   ) {
     return NextResponse.json(
-      { ok: false, message: "Viewers have read-only access." },
+      { ok: false, message: "This action requires an admin." },
       { status: 403 },
     );
   }

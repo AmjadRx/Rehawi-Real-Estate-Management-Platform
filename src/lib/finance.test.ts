@@ -4,6 +4,7 @@ import {
   computePropertyFinancials,
   convert,
   formatPayback,
+  paybackDate,
   scaleByShare,
   type PropertyFinancials,
   type RateTable,
@@ -256,7 +257,7 @@ describe("3-asset family scenario", () => {
   it("the rented asset's own payback is meaningful on its own", () => {
     // (200,000 − 3,000) / 500 = 394 months ≈ 32y 10m
     expect(rented.paybackMonths).toBeCloseTo(394);
-    expect(formatPayback(rented.paybackMonths)).toBe("32 years 10 months");
+    expect(formatPayback(rented.paybackMonths)).toBe("32 years, 10 months");
   });
 
   it("aggregate ratios are recomputed from sums, not averaged", () => {
@@ -272,12 +273,35 @@ describe("formatPayback", () => {
     [1, "1 month"],
     [11, "11 months"],
     [12, "1 year"],
-    [18, "1 year 6 months"],
-    [394, "32 years 10 months"],
-    [5_994, "499 years 6 months"],
+    [18, "1 year, 6 months"],
+    [394, "32 years, 10 months"],
+    // Uncapped (§6.2 v2): huge horizons are reported as-is.
+    [5_994, "499 years, 6 months"],
+    // Fractional months carry into years instead of showing "1 year, 12 months".
+    [23.6, "2 years"],
   ];
   it.each(cases)("formats %s as %s", (months, expected) => {
     expect(formatPayback(months)).toBe(expected);
+  });
+});
+
+describe("paybackDate", () => {
+  const from = new Date(2026, 6, 14); // 14 July 2026
+
+  it("is null when nothing is generating or already returned", () => {
+    expect(paybackDate(null, from)).toBeNull();
+    expect(paybackDate(0, from)).toBeNull();
+  });
+
+  it("projects months forward from the given date", () => {
+    const d = paybackDate(18, from)!;
+    expect(d.getFullYear()).toBe(2028);
+    expect(d.getMonth()).toBe(0); // January 2028
+  });
+
+  it("handles multi-century horizons without capping", () => {
+    const d = paybackDate(5_994, from)!;
+    expect(d.getFullYear()).toBe(2526);
   });
 });
 

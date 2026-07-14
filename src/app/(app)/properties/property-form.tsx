@@ -1,8 +1,8 @@
 "use client";
 
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,6 +94,8 @@ export function PropertyFormDialog({
     initialOwners ?? [],
   );
   const [busy, setBusy] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const extractRef = useRef<HTMLInputElement>(null);
   const isEdit = !!initial?.id;
 
   const shareTotal = useMemo(
@@ -141,6 +143,73 @@ export function PropertyFormDialog({
       </Select>
     </div>
   );
+
+  /**
+   * §6.3 v2 "Autofill from documents": send screenshots/photos/PDFs to
+   * /api/v1/extract and prefill the form with the returned draft. The
+   * draft only fills fields; nothing is saved until the user submits.
+   */
+  async function autofill(files: FileList) {
+    if (files.length === 0) return;
+    setExtracting(true);
+    try {
+      const formData = new FormData();
+      for (const file of Array.from(files)) formData.append("files", file);
+      const res = await fetch("/api/v1/extract", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.message ?? "Autofill failed. Fill the form manually.");
+        return;
+      }
+      const draft = (data.draft ?? {}) as Record<string, unknown>;
+      const patch: Partial<PropertyFormValues> = {};
+      const put = (key: keyof PropertyFormValues, raw: unknown) => {
+        if (raw === null || raw === undefined || raw === "") return;
+        patch[key] = String(raw);
+      };
+      put("name", draft.name);
+      if (
+        typeof draft.type === "string" &&
+        ["residential", "commercial", "land", "mixed"].includes(draft.type)
+      ) {
+        patch.type = draft.type;
+      }
+      if (
+        typeof draft.status === "string" &&
+        ["planned", "under_construction", "completed"].includes(draft.status)
+      ) {
+        patch.status = draft.status;
+      }
+      put("purchasePrice", draft.purchasePrice);
+      put("currentValue", draft.currentValue);
+      if (typeof draft.currency === "string" && draft.currency.length === 3) {
+        patch.currency = draft.currency.toUpperCase();
+      }
+      put("country", draft.country);
+      put("city", draft.city);
+      put("addressLine", draft.addressLine);
+      put("postalCode", draft.postalCode);
+      put("sizeSqm", draft.sizeSqm);
+      put("yearBuilt", draft.yearBuilt);
+      put("description", draft.description);
+
+      const filled = Object.keys(patch).length;
+      setValues((v) => ({ ...v, ...patch }));
+      if (filled > 0) {
+        toast.success(
+          `Filled ${filled} field${filled === 1 ? "" : "s"} from your documents. Review everything before saving.`,
+        );
+      } else {
+        toast.info("No property details were found in these files.");
+      }
+    } finally {
+      setExtracting(false);
+      if (extractRef.current) extractRef.current.value = "";
+    }
+  }
 
   async function submit() {
     if (!values.name || !values.country || !values.city) {
@@ -224,6 +293,47 @@ export function PropertyFormDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {!isEdit && (
+            <section className="rounded-xl border border-dashed bg-muted/40 p-3.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                    <Sparkles className="size-4 text-primary" aria-hidden />
+                    Autofill from documents
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Optional: upload listing screenshots, photos or PDFs. AI
+                    drafts the fields below for your review. Nothing is saved
+                    until you submit.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={extracting}
+                  onClick={() => extractRef.current?.click()}
+                >
+                  {extracting ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Sparkles className="size-4" aria-hidden />
+                  )}
+                  {extracting ? "Reading documents" : "Choose files"}
+                </Button>
+                <input
+                  ref={extractRef}
+                  type="file"
+                  hidden
+                  multiple
+                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                  onChange={(e) => e.target.files && autofill(e.target.files)}
+                />
+              </div>
+            </section>
+          )}
+
           <section className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground">
               Details

@@ -7,13 +7,18 @@ import { requireAdmin, requireUser } from "@/lib/auth/guard";
 import { ownerCreate } from "@/lib/validation";
 
 export const GET = apiHandler(async () => {
-  await requireUser();
+  const user = await requireUser();
   const db = await getDb();
   const rows = await db
     .select()
     .from(tables.owners)
     .orderBy(asc(tables.owners.name));
-  return jsonOk({ owners: rows });
+  // Bank details are admin-only (§4 v2): stripped, never sent to viewers.
+  const owners =
+    user.role === "admin"
+      ? rows
+      : rows.map(({ bankDetails: _bankDetails, ...rest }) => rest);
+  return jsonOk({ owners });
 });
 
 export const POST = apiHandler(async (request: NextRequest) => {

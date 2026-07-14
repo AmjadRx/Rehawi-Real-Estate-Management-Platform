@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 import { getDb, tables } from "@/db";
 import { apiHandler, jsonError, jsonOk, parseBody } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin, requireUser } from "@/lib/auth/guard";
+import { requireUser } from "@/lib/auth/guard";
+import { requireCanEditProperty } from "@/lib/auth/permissions";
 import { propertyContactLink } from "@/lib/validation";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -27,8 +28,9 @@ export const GET = apiHandler(async (_request: NextRequest, { params }: Ctx) => 
 });
 
 export const POST = apiHandler(async (request: NextRequest, { params }: Ctx) => {
-  const user = await requireAdmin();
+  const user = await requireUser();
   const { id } = await params;
+  await requireCanEditProperty(user, id);
   const data = await parseBody(request, propertyContactLink);
   const db = await getDb();
   await db
@@ -50,8 +52,9 @@ export const POST = apiHandler(async (request: NextRequest, { params }: Ctx) => 
 
 export const DELETE = apiHandler(
   async (request: NextRequest, { params }: Ctx) => {
-    const user = await requireAdmin();
+    const user = await requireUser();
     const { id } = await params;
+    await requireCanEditProperty(user, id);
     const contactId = request.nextUrl.searchParams.get("contactId");
     if (!contactId) return jsonError(400, "contactId is required.");
     const db = await getDb();

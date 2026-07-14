@@ -46,10 +46,10 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export function DocumentsPanel({
   detail,
-  isAdmin,
+  canEdit,
 }: {
   detail: PropertyDetail;
-  isAdmin: boolean;
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -111,7 +111,7 @@ export function DocumentsPanel({
 
   return (
     <div className="space-y-4">
-      {isAdmin && (
+      {canEdit && (
         <div
           className={cn(
             "rounded-2xl border-2 border-dashed bg-card p-6 text-center transition-colors",
@@ -265,7 +265,7 @@ export function DocumentsPanel({
                             <Download className="size-4" aria-hidden />
                           </a>
                         </Button>
-                        {isAdmin && (
+                        {canEdit && (
                           <Button
                             variant="ghost"
                             size="icon"

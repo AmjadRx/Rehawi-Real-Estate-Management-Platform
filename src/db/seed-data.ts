@@ -176,7 +176,7 @@ export async function seed(db: Database) {
   const [tower] = await db
     .insert(t.properties)
     .values({
-      name: "Marina Heights Tower — Unit 2304",
+      name: "Marina Heights Tower, Unit 2304",
       type: "commercial",
       status: "under_construction",
       occupancy: "n/a",
@@ -272,7 +272,7 @@ export async function seed(db: Database) {
   ]);
 
   await db.insert(t.propertyContacts).values([
-    { propertyId: tower.id, contactId: developer.id, relationshipNote: "Developer — Emaar" },
+    { propertyId: tower.id, contactId: developer.id, relationshipNote: "Developer: Emaar" },
     { propertyId: tower.id, contactId: lawyer.id, relationshipNote: "Contract review" },
   ]);
 

@@ -1,0 +1,66 @@
+{
+  "app": {
+    "name": "Rehawi Estates",
+    "tagline": "Family portfolio"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "properties": "Properties",
+    "worldMap": "World Map",
+    "owners": "Owners",
+    "directory": "Directory",
+    "admin": "Admin",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "dashboard": {
+    "title": "Family portfolio",
+    "propertiesSummary": "{count} properties: {completed} completed, {underConstruction} under construction, {planned} planned",
+    "totalInvested": "Total invested",
+    "totalReturned": "Total returned",
+    "monthlyIncome": "Monthly income",
+    "yearlyIncome": "Yearly income",
+    "outstanding": "Outstanding commitments",
+    "fullReturn": "Estimated time to full return",
+    "projectedDate": "Projected: {date}",
+    "needsAttention": "Needs attention",
+    "incomeVsExpenses": "Income vs expenses",
+    "income": "Income",
+    "expenses": "Expenses",
+    "chartCaption": "Last 12 months, family share, in {currency}",
+    "recentActivity": "Recent activity",
+    "activityEmpty": "Changes will appear here."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Your profile and app preferences.",
+    "profile": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "photo": "Profile photo",
+    "changePhoto": "Change photo",
+    "save": "Save profile",
+    "saved": "Profile saved.",
+    "language": "Language",
+    "languageHint": "Applies immediately across the app.",
+    "english": "English",
+    "arabic": "Arabic",
+    "password": "Password",
+    "passwordHint": "For email sign-in. At least 10 characters.",
+    "newPassword": "New password",
+    "savePassword": "Save password",
+    "passwordSaved": "Password saved.",
+    "signedInAs": "Signed in as {identifier} ({role})"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "saving": "Saving",
+    "notSet": "Not set",
+    "notYetGenerating": "Not yet generating income",
+    "fullyReturned": "Fully returned",
+    "paybackYears": "{years, plural, one {# year} other {# years}}",
+    "paybackMonths": "{months, plural, one {# month} other {# months}}",
+    "paybackBoth": "{years, plural, one {# year} other {# years}}, {months, plural, one {# month} other {# months}}"
+  }
+}

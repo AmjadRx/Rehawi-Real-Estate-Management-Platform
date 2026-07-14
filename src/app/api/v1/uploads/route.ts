@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server";
 import { getDb, tables } from "@/db";
 import { apiHandler, jsonError, jsonOk } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin } from "@/lib/auth/guard";
+import { requireUser } from "@/lib/auth/guard";
+import { requireCanEditProperty } from "@/lib/auth/permissions";
 import { ALLOWED_MIME, MAX_UPLOAD_BYTES, storeFile } from "@/lib/files";
 
 const CATEGORIES = new Set([
@@ -21,7 +22,7 @@ const CATEGORIES = new Set([
 
 /** POST /api/v1/uploads — multipart form: file, category, propertyId? (§7/§8) */
 export const POST = apiHandler(async (request: NextRequest) => {
-  const user = await requireAdmin();
+  const user = await requireUser();
   const form = await request.formData().catch(() => null);
   if (!form) return jsonError(400, "Expected multipart form data.");
 
@@ -41,7 +42,18 @@ export const POST = apiHandler(async (request: NextRequest) => {
     ? String(form.get("propertyId"))
     : null;
   const contactId = form.get("contactId") ? String(form.get("contactId")) : null;
+  const ownerId = form.get("ownerId") ? String(form.get("ownerId")) : null;
   const isCover = form.get("isCover") === "true";
+
+  // §7 v2: non-admins may upload to properties they created, or an
+  // unlinked photo for their own profile. Everything else is admin-only.
+  if (user.role !== "admin") {
+    if (propertyId) {
+      await requireCanEditProperty(user, propertyId);
+    } else if (contactId || ownerId || !mime.startsWith("image/")) {
+      return jsonError(403, "This action requires an admin.");
+    }
+  }
 
   const stored = await storeFile(file.name, mime, await file.arrayBuffer());
 
@@ -53,6 +65,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     .values({
       propertyId,
       contactId,
+      ownerId,
       category: category as never,
       blobUrl: stored.url,
       filename: file.name,

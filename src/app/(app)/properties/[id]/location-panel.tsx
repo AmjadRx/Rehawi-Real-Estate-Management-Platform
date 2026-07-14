@@ -18,10 +18,10 @@ import type { PropertyDetail } from "@/lib/property-detail";
  */
 export function LocationPanel({
   detail,
-  isAdmin,
+  canEdit,
 }: {
   detail: PropertyDetail;
-  isAdmin: boolean;
+  canEdit: boolean;
 }) {
   const { property } = detail;
   const router = useRouter();
@@ -79,7 +79,7 @@ export function LocationPanel({
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Street</dt>
               <dd className="text-right font-medium">
-                {property.addressLine ?? "—"}
+                {property.addressLine ?? "-"}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
@@ -89,7 +89,7 @@ export function LocationPanel({
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Postal code</dt>
               <dd className="text-right font-medium">
-                {property.postalCode ?? "—"}
+                {property.postalCode ?? "-"}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
@@ -112,7 +112,7 @@ export function LocationPanel({
             <MapPin className="size-4" aria-hidden />
             Coordinates
           </h3>
-          {isAdmin ? (
+          {canEdit ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

@@ -26,7 +26,7 @@ export const OCCUPANCY_LABEL: Record<string, string> = {
   rented: "Rented",
   vacant: "Vacant",
   owner_use: "Owner use",
-  "n/a": "—",
+  "n/a": "-",
 };
 
 export const CONTACT_ROLE_LABEL: Record<string, string> = {

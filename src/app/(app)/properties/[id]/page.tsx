@@ -41,18 +41,22 @@ export default async function PropertyPage({
     .from(tables.contacts)
     .orderBy(asc(tables.contacts.name));
 
-  const isAdmin = user?.role === "admin";
+  // §7 v2 self-service: admins edit everything; other users edit the
+  // properties they created (the API enforces the same rule).
+  const canEdit =
+    user?.role === "admin" ||
+    (!!user && detail.property.createdBy === user.id);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-8">
       <PropertyHeader
         detail={detail}
-        isAdmin={isAdmin}
+        canEdit={canEdit}
         owners={allOwners.map((o) => ({ id: o.id, name: o.name }))}
       />
       <PropertyTabs
         detail={detail}
-        isAdmin={isAdmin}
+        canEdit={canEdit}
         allContacts={allContacts.map((c) => ({
           id: c.id,
           name: c.name,

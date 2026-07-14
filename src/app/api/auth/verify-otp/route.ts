@@ -83,7 +83,12 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({
     ok: true,
     token, // for the native app (§12) — web uses the httpOnly cookie
-    user: { id: user.id, role, name: user.name },
+    user: {
+      id: user.id,
+      role,
+      name: user.name,
+      passwordSet: !!user.passwordHash,
+    },
   });
   response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
   return response;

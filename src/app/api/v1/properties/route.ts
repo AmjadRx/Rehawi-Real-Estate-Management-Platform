@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 import { getDb, tables } from "@/db";
 import { apiHandler, jsonOk, parseBody } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin, requireUser } from "@/lib/auth/guard";
+import { requireUser } from "@/lib/auth/guard";
+import { ensureUserRow } from "@/lib/users";
 import { propertyCreate } from "@/lib/validation";
 
 export const GET = apiHandler(async (request: NextRequest) => {
@@ -33,13 +34,16 @@ export const GET = apiHandler(async (request: NextRequest) => {
 });
 
 export const POST = apiHandler(async (request: NextRequest) => {
-  const user = await requireAdmin();
+  // §7 v2: property creation is open to all signed-in users.
+  const user = await requireUser();
   const data = await parseBody(request, propertyCreate);
+  await ensureUserRow(user.id);
   const db = await getDb();
   const [row] = await db
     .insert(tables.properties)
     .values({
       ...data,
+      createdBy: user.id,
       lat: data.lat != null ? String(data.lat) : null,
       lng: data.lng != null ? String(data.lng) : null,
       sizeSqm: data.sizeSqm != null ? String(data.sizeSqm) : null,

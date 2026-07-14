@@ -46,8 +46,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatPayback } from "@/lib/finance";
-import { formatMoney, formatPercent, countryFlag } from "@/lib/format";
+import { formatPayback, paybackDate } from "@/lib/finance";
+import {
+  countryFlag,
+  formatMoney,
+  formatMonthYear,
+  formatPercent,
+} from "@/lib/format";
 import { STATUS_BADGE, STATUS_LABEL } from "@/lib/labels";
 import type { MonthlyFlow, PortfolioSummary } from "@/lib/portfolio";
 
@@ -121,6 +126,17 @@ export function OwnersView({
           <h1 className="text-2xl md:text-3xl">{scopeName}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Every figure below is scaled to this profile&apos;s ownership share.
+            {summary.scope.kind === "owner" && (
+              <>
+                {" "}
+                <Link
+                  href={`/owners/${summary.scope.ownerId}`}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Open full profile
+                </Link>
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -191,7 +207,11 @@ export function OwnersView({
           <StatCard
             label="Estimated time to full investment return"
             value={formatPayback(totals.paybackMonths)}
-            caption="Deliberately honest math: (invested − returned) ÷ monthly run-rate"
+            caption={
+              paybackDate(totals.paybackMonths)
+                ? `Projected: ${formatMonthYear(paybackDate(totals.paybackMonths))}. Honest math: (invested minus returned) divided by the monthly run-rate.`
+                : "Honest math: (invested minus returned) divided by the monthly run-rate."
+            }
           />
         </StaggerItem>
       </Stagger>
@@ -273,7 +293,7 @@ export function OwnersView({
                       value={
                         active.latestConstructionPct !== null
                           ? `${active.latestConstructionPct}%`
-                          : "—"
+                          : "-"
                       }
                     />
                     <MiniStat
@@ -288,7 +308,7 @@ export function OwnersView({
                               active.nextInstallment.amount,
                               active.nextInstallment.currency,
                             )
-                          : "—"
+                          : "-"
                       }
                     />
                   </>

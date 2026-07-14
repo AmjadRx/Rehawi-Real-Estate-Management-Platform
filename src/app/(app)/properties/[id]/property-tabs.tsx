@@ -9,6 +9,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { useState } from "react";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -22,11 +23,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatPayback } from "@/lib/finance";
+import { formatPayback, paybackDate } from "@/lib/finance";
 import {
   countryFlag,
   formatDate,
   formatMoney,
+  formatMonthYear,
   formatNumber,
   formatPercent,
 } from "@/lib/format";
@@ -120,7 +122,7 @@ function LinkContactControl({
       {available.map((c) => (
         <option key={c.id} value={c.id}>
           {c.name}
-          {c.companyName ? ` — ${c.companyName}` : ""}
+          {c.companyName ? `, ${c.companyName}` : ""}
         </option>
       ))}
     </select>
@@ -129,11 +131,11 @@ function LinkContactControl({
 
 export function PropertyTabs({
   detail,
-  isAdmin,
+  canEdit,
   allContacts,
 }: {
   detail: PropertyDetail;
-  isAdmin: boolean;
+  canEdit: boolean;
   allContacts: Array<{
     id: string;
     name: string;
@@ -271,7 +273,12 @@ export function PropertyTabs({
                           className="flex items-center justify-between gap-3"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{o.name}</span>
+                            <Link
+                              href={`/owners/${o.ownerId}`}
+                              className="font-medium underline-offset-4 hover:underline"
+                            >
+                              {o.name}
+                            </Link>
                             {o.isLegalOwner && (
                               <Badge variant="outline">On paper</Badge>
                             )}
@@ -315,9 +322,16 @@ export function PropertyTabs({
                   label="Payback estimate"
                   value={formatPayback(financials.paybackMonths)}
                   caption={
-                    financials.capRate !== null
-                      ? `Cap rate ${formatPercent(financials.capRate, 1)}`
-                      : undefined
+                    [
+                      paybackDate(financials.paybackMonths)
+                        ? `Projected: ${formatMonthYear(paybackDate(financials.paybackMonths))}`
+                        : null,
+                      financials.capRate !== null
+                        ? `Cap rate ${formatPercent(financials.capRate, 1)}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(". ") || undefined
                   }
                 />
               </div>
@@ -326,7 +340,7 @@ export function PropertyTabs({
                 <Section
                   title="Income"
                   action={
-                    isAdmin && (
+                    canEdit && (
                       <AddRecordButton
                         propertyId={property.id}
                         resource="income"
@@ -379,7 +393,7 @@ export function PropertyTabs({
                 <Section
                   title="Expenses"
                   action={
-                    isAdmin && (
+                    canEdit && (
                       <AddRecordButton
                         propertyId={property.id}
                         resource="expenses"
@@ -454,7 +468,7 @@ export function PropertyTabs({
                 <Section
                   title="Payments made"
                   action={
-                    isAdmin && (
+                    canEdit && (
                       <AddRecordButton
                         propertyId={property.id}
                         resource="payments"
@@ -512,7 +526,7 @@ export function PropertyTabs({
                 <Section
                   title="Installment schedule"
                   action={
-                    isAdmin && (
+                    canEdit && (
                       <AddRecordButton
                         propertyId={property.id}
                         resource="installments"
@@ -582,7 +596,7 @@ export function PropertyTabs({
                   value={
                     detail.constructionUpdates.at(-1)?.progressPct != null
                       ? `${detail.constructionUpdates.at(-1)!.progressPct}%`
-                      : "—"
+                      : "-"
                   }
                   caption="Latest reported"
                 />
@@ -600,7 +614,7 @@ export function PropertyTabs({
                           detail.installments.find((i) => i.status !== "paid")!
                             .currency,
                         )
-                      : "—"
+                      : "-"
                   }
                   caption={
                     detail.installments.find((i) => i.status !== "paid")
@@ -616,7 +630,7 @@ export function PropertyTabs({
               <Section
                 title="Updates"
                 action={
-                  isAdmin && (
+                  canEdit && (
                     <AddRecordButton
                       propertyId={property.id}
                       resource="construction-updates"
@@ -697,14 +711,14 @@ export function PropertyTabs({
                       value={
                         lease.depositAmount
                           ? formatMoney(lease.depositAmount, lease.currency)
-                          : "—"
+                          : "-"
                       }
                     />
                     <StatCard
                       label="Expires in"
                       value={
                         expiresDays === null
-                          ? "—"
+                          ? "-"
                           : expiresDays > 0
                             ? `${expiresDays} days`
                             : "Expired"
@@ -718,7 +732,7 @@ export function PropertyTabs({
               <Section
                 title="Income received"
                 action={
-                  isAdmin && (
+                  canEdit && (
                     <AddRecordButton
                       propertyId={property.id}
                       resource="income"
@@ -758,7 +772,7 @@ export function PropertyTabs({
                 )}
               </Section>
 
-              {isAdmin && detail.leases.length === 0 && (
+              {canEdit && detail.leases.length === 0 && (
                 <AddRecordButton
                   propertyId={property.id}
                   resource="leases"
@@ -786,14 +800,14 @@ export function PropertyTabs({
           )}
 
           {tab === "documents" && (
-            <DocumentsPanel detail={detail} isAdmin={isAdmin} />
+            <DocumentsPanel detail={detail} canEdit={canEdit} />
           )}
 
           {tab === "contacts" && (
             <Section
               title="Linked contacts"
               action={
-                isAdmin && (
+                canEdit && (
                   <LinkContactControl
                     propertyId={property.id}
                     allContacts={allContacts}
@@ -868,14 +882,14 @@ export function PropertyTabs({
           )}
 
           {tab === "location" && (
-            <LocationPanel detail={detail} isAdmin={isAdmin} />
+            <LocationPanel detail={detail} canEdit={canEdit} />
           )}
 
           {tab === "maintenance" && (
             <Section
               title="Work orders"
               action={
-                isAdmin && (
+                canEdit && (
                   <AddRecordButton
                     propertyId={property.id}
                     resource="maintenance"
