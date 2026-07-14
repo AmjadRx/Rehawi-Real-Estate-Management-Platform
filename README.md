@@ -1,5 +1,21 @@
 # Rehawi Real Estate Management Platform
 
+## CSS Studio setup
+
+[CSS Studio](https://cssstudio.ai) is installed as a dev dependency (`cssstudio`), with its `css-studio` MCP server configured in [`.mcp.json`](.mcp.json) and the `studio` skill in `.claude/skills/studio/` and `.agents/skills/studio/` (installed via `npx cssstudio install`).
+
+**When app code is added to this repo**, initialise CSS Studio in the app's entry point so it runs only in development and is never shipped to end users:
+
+```javascript
+import { startStudio } from "cssstudio";
+
+if (process.env.NODE_ENV === "development") {
+  startStudio();
+}
+```
+
+After restarting your agent, run `/studio` to start editing.
+
 ## Motion AI Kit setup
 
 This repo is configured to use the [Motion](https://motion.dev) AI Kit (MCP server + skills) with AI coding agents such as Claude Code.

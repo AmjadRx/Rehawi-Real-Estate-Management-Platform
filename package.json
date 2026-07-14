@@ -1,0 +1,19 @@
+{
+  "name": "rehawi-real-estate-management-platform",
+  "version": "1.0.0",
+  "description": "Rehawi Real Estate Management Platform",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:41729/git/AmjadRx/Rehawi-Real-Estate-Management-Platform"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "devDependencies": {
+    "cssstudio": "^1.2.0"
+  }
+}
