@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 import { getDb, tables } from "@/db";
 import { apiHandler, jsonError, jsonOk, parseBody } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin, requireUser } from "@/lib/auth/guard";
+import { requireUser } from "@/lib/auth/guard";
+import { requireCanEditProperty } from "@/lib/auth/permissions";
 import { propertyUpdate } from "@/lib/validation";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -118,8 +119,9 @@ export const GET = apiHandler(async (_request: NextRequest, { params }: Ctx) => 
 
 export const PATCH = apiHandler(
   async (request: NextRequest, { params }: Ctx) => {
-    const user = await requireAdmin();
+    const user = await requireUser();
     const { id } = await params;
+    await requireCanEditProperty(user, id);
     const data = await parseBody(request, propertyUpdate);
     const db = await getDb();
 
@@ -163,8 +165,9 @@ export const PATCH = apiHandler(
 /** Soft delete (§10.5) — recoverable; hard purge is a manual admin operation. */
 export const DELETE = apiHandler(
   async (_request: NextRequest, { params }: Ctx) => {
-    const user = await requireAdmin();
+    const user = await requireUser();
     const { id } = await params;
+    await requireCanEditProperty(user, id);
     const db = await getDb();
     const [row] = await db
       .update(tables.properties)

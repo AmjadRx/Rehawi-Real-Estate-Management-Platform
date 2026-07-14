@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 import { getDb, tables } from "@/db";
 import { apiHandler, jsonError, jsonOk, parseBody } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin, requireUser } from "@/lib/auth/guard";
+import { requireUser } from "@/lib/auth/guard";
+import { requireCanEditProperty } from "@/lib/auth/permissions";
 import { propertyOwnerSet } from "@/lib/validation";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -32,8 +33,9 @@ export const GET = apiHandler(async (_request: NextRequest, { params }: Ctx) => 
  * (validated by schema). PUT semantics keep share math atomic and simple.
  */
 export const PUT = apiHandler(async (request: NextRequest, { params }: Ctx) => {
-  const user = await requireAdmin();
+  const user = await requireUser();
   const { id } = await params;
+  await requireCanEditProperty(user, id);
   const data = await parseBody(request, propertyOwnerSet);
   const db = await getDb();
 

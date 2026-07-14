@@ -9,6 +9,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { useState } from "react";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -271,7 +272,12 @@ export function PropertyTabs({
                           className="flex items-center justify-between gap-3"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{o.name}</span>
+                            <Link
+                              href={`/owners/${o.ownerId}`}
+                              className="font-medium underline-offset-4 hover:underline"
+                            >
+                              {o.name}
+                            </Link>
                             {o.isLegalOwner && (
                               <Badge variant="outline">On paper</Badge>
                             )}

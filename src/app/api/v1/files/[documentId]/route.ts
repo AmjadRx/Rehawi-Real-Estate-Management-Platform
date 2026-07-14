@@ -4,6 +4,7 @@ import { getDb, tables } from "@/db";
 import { apiHandler, jsonError, jsonOk } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { requireAdmin, requireUser } from "@/lib/auth/guard";
+import { requireCanEditProperty } from "@/lib/auth/permissions";
 import { deleteStoredFile, readFileStream } from "@/lib/files";
 
 type Ctx = { params: Promise<{ documentId: string }> };
@@ -44,10 +45,31 @@ export const GET = apiHandler(async (_request: NextRequest, { params }: Ctx) => 
 /** Soft delete (§8/§10.5): nothing is hard-lost by one click. */
 export const DELETE = apiHandler(
   async (request: NextRequest, { params }: Ctx) => {
-    const user = await requireAdmin();
+    const user = await requireUser();
     const { documentId } = await params;
     const db = await getDb();
     const purge = request.nextUrl.searchParams.get("purge") === "true";
+
+    // §7 v2: purge stays admin-only; soft delete is allowed for admins,
+    // the uploader, or the creator of the linked property.
+    if (purge && user.role !== "admin") {
+      await requireAdmin();
+    }
+    if (!purge && user.role !== "admin") {
+      const [doc] = await db
+        .select({
+          uploadedBy: tables.documents.uploadedBy,
+          propertyId: tables.documents.propertyId,
+        })
+        .from(tables.documents)
+        .where(eq(tables.documents.id, documentId))
+        .limit(1);
+      if (!doc) return jsonError(404, "File not found.");
+      if (doc.uploadedBy !== user.id) {
+        if (!doc.propertyId) return jsonError(403, "This action requires an admin.");
+        await requireCanEditProperty(user, doc.propertyId);
+      }
+    }
 
     if (purge) {
       const [doc] = await db

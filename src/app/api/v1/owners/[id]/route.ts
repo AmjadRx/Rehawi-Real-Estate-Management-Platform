@@ -9,7 +9,7 @@ import { ownerUpdate } from "@/lib/validation";
 type Ctx = { params: Promise<{ id: string }> };
 
 export const GET = apiHandler(async (_r: NextRequest, { params }: Ctx) => {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
   const db = await getDb();
   const [row] = await db
@@ -18,6 +18,11 @@ export const GET = apiHandler(async (_r: NextRequest, { params }: Ctx) => {
     .where(eq(tables.owners.id, id))
     .limit(1);
   if (!row) return jsonError(404, "Owner not found.");
+  // Bank details are admin-only (§4 v2).
+  if (user.role !== "admin") {
+    const { bankDetails: _bankDetails, ...rest } = row;
+    return jsonOk({ owner: rest });
+  }
   return jsonOk({ owner: row });
 });
 

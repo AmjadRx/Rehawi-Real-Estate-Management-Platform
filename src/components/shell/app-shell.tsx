@@ -7,8 +7,10 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  ShieldCheck,
   Users,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,12 +23,13 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/properties", label: "Properties", icon: Building2 },
-  { href: "/world-map", label: "World Map", icon: Globe2 },
-  { href: "/owners", label: "Owners", icon: Users },
-  { href: "/directory", label: "Directory", icon: Contact },
-  { href: "/admin", label: "Admin", icon: Settings, adminOnly: true },
+  { href: "/", key: "dashboard", icon: LayoutDashboard },
+  { href: "/properties", key: "properties", icon: Building2 },
+  { href: "/world-map", key: "worldMap", icon: Globe2 },
+  { href: "/owners", key: "owners", icon: Users },
+  { href: "/directory", key: "directory", icon: Contact },
+  { href: "/settings", key: "settings", icon: Settings },
+  { href: "/admin", key: "admin", icon: ShieldCheck, adminOnly: true },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -44,6 +47,8 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("nav");
+  const tApp = useTranslations("app");
   const items = NAV.filter((n) => !("adminOnly" in n && n.adminOnly) || role === "admin");
 
   async function logout() {
@@ -61,13 +66,14 @@ export function AppShell({
             <Building2 className="size-5" aria-hidden />
           </div>
           <div className="leading-tight">
-            <p className="font-semibold">Rehawi Estates</p>
-            <p className="text-xs text-muted-foreground">Family portfolio</p>
+            <p className="font-semibold">{tApp("name")}</p>
+            <p className="text-xs text-muted-foreground">{tApp("tagline")}</p>
           </div>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-2" aria-label="Main">
-          {items.map(({ href, label, icon: Icon }) => {
+          {items.map(({ href, key, icon: Icon }) => {
+            const label = t(key);
             const active = isActive(pathname, href);
             return (
               <Link
@@ -107,12 +113,12 @@ export function AppShell({
                   variant="ghost"
                   size="icon"
                   onClick={logout}
-                  aria-label="Sign out"
+                  aria-label={t("signOut")}
                 >
                   <LogOut className="size-4" aria-hidden />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Sign out</TooltipContent>
+              <TooltipContent>{t("signOut")}</TooltipContent>
             </Tooltip>
           </div>
         </div>
@@ -126,13 +132,13 @@ export function AppShell({
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Building2 className="size-4" aria-hidden />
             </div>
-            <span className="font-semibold">Rehawi Estates</span>
+            <span className="font-semibold">{tApp("name")}</span>
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={logout}
-            aria-label="Sign out"
+            aria-label={t("signOut")}
           >
             <LogOut className="size-4" aria-hidden />
           </Button>
@@ -147,7 +153,8 @@ export function AppShell({
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           <div className="grid auto-cols-fr grid-flow-col">
-            {items.map(({ href, label, icon: Icon }) => {
+            {items.map(({ href, key, icon: Icon }) => {
+              const label = t(key);
               const active = isActive(pathname, href);
               return (
                 <Link

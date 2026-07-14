@@ -17,6 +17,8 @@ export default async function DirectoryPage() {
         contactId: tables.propertyContacts.contactId,
         propertyId: tables.propertyContacts.propertyId,
         propertyName: tables.properties.name,
+        city: tables.properties.city,
+        country: tables.properties.country,
       })
       .from(tables.propertyContacts)
       .innerJoin(
@@ -27,11 +29,16 @@ export default async function DirectoryPage() {
 
   const linksByContact = new Map<
     string,
-    Array<{ id: string; name: string }>
+    Array<{ id: string; name: string; city: string; country: string }>
   >();
   for (const link of links) {
     const list = linksByContact.get(link.contactId) ?? [];
-    list.push({ id: link.propertyId, name: link.propertyName });
+    list.push({
+      id: link.propertyId,
+      name: link.propertyName,
+      city: link.city,
+      country: link.country,
+    });
     linksByContact.set(link.contactId, list);
   }
 

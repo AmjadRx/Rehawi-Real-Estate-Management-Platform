@@ -3,6 +3,7 @@
 import {
   Building2,
   Globe,
+  Info,
   Loader2,
   Mail,
   MessageCircle,
@@ -44,7 +45,7 @@ interface ContactCard {
   whatsapp: string | null;
   website: string | null;
   notes: string | null;
-  properties: Array<{ id: string; name: string }>;
+  properties: Array<{ id: string; name: string; city: string; country: string }>;
 }
 
 /** Role grouping order (§6.7). */
@@ -70,6 +71,9 @@ export function DirectoryView({
 }) {
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [groupMode, setGroupMode] = useState<"role" | "location" | "property">(
+    "role",
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,10 +87,41 @@ export function DirectoryView({
     );
   }, [contacts, query]);
 
-  const groups = GROUP_ORDER.map(([title, roles]) => ({
-    title,
-    items: filtered.filter((c) => roles.includes(c.role)),
-  })).filter((g) => g.items.length > 0);
+  // §6.7 v2 grouping switcher: by role, by location, or by property.
+  let groups: Array<{ title: string; items: ContactCard[] }>;
+  if (groupMode === "role") {
+    groups = GROUP_ORDER.map(([title, roles]) => ({
+      title,
+      items: filtered.filter((c) => roles.includes(c.role)),
+    }));
+  } else if (groupMode === "location") {
+    const byLocation = new Map<string, ContactCard[]>();
+    for (const c of filtered) {
+      const keys = c.properties.length
+        ? [...new Set(c.properties.map((p) => `${p.country} · ${p.city}`))]
+        : ["No linked location"];
+      for (const key of keys) {
+        byLocation.set(key, [...(byLocation.get(key) ?? []), c]);
+      }
+    }
+    groups = [...byLocation.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([title, items]) => ({ title, items }));
+  } else {
+    const byProperty = new Map<string, ContactCard[]>();
+    for (const c of filtered) {
+      const keys = c.properties.length
+        ? c.properties.map((p) => p.name)
+        : ["Not linked to a property"];
+      for (const key of keys) {
+        byProperty.set(key, [...(byProperty.get(key) ?? []), c]);
+      }
+    }
+    groups = [...byProperty.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([title, items]) => ({ title, items }));
+  }
+  groups = groups.filter((g) => g.items.length > 0);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-8">
@@ -106,18 +141,33 @@ export function DirectoryView({
         )}
       </FadeIn>
 
-      <FadeIn delay={0.05} className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, company, role or property…"
-          className="pl-9"
-          aria-label="Search contacts"
-        />
+      <FadeIn delay={0.05} className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, company, role or property"
+            className="pl-9"
+            aria-label="Search contacts"
+          />
+        </div>
+        <Select
+          value={groupMode}
+          onValueChange={(v) => setGroupMode(v as typeof groupMode)}
+        >
+          <SelectTrigger className="w-full sm:w-52" aria-label="Group contacts by">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="role">Group by role</SelectItem>
+            <SelectItem value="location">Group by location</SelectItem>
+            <SelectItem value="property">Group by property</SelectItem>
+          </SelectContent>
+        </Select>
       </FadeIn>
 
       {groups.length === 0 ? (
@@ -126,7 +176,7 @@ export function DirectoryView({
         </FadeIn>
       ) : (
         groups.map((group, gi) => (
-          <FadeIn key={group.title} delay={0.05 * gi}>
+          <FadeIn key={`${groupMode}:${group.title}`} delay={0.05 * gi}>
             <h2 className="mb-3 text-base font-semibold">
               {group.title}{" "}
               <span className="text-sm font-normal text-muted-foreground">
@@ -146,9 +196,18 @@ export function DirectoryView({
                           </p>
                         )}
                       </div>
-                      <Badge variant="secondary">
-                        {CONTACT_ROLE_LABEL[contact.role]}
-                      </Badge>
+                      <span className="flex items-center gap-1">
+                        <Badge variant="secondary">
+                          {CONTACT_ROLE_LABEL[contact.role]}
+                        </Badge>
+                        <Link
+                          href={`/directory/${contact.id}`}
+                          aria-label={`Open ${contact.name}'s profile`}
+                          className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                          <Info className="size-4" aria-hidden />
+                        </Link>
+                      </span>
                     </div>
 
                     {contact.phones.length > 0 && (

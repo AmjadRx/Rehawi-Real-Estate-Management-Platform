@@ -50,6 +50,11 @@ export const ownerCreate = z.object({
   name: z.string().min(1).max(200),
   isFamily: z.boolean().default(false),
   contactId: z.uuid().nullish(),
+  email: z.email().nullish(),
+  phones: z.array(z.string().max(30)).nullish(),
+  socialLinks: z.record(z.string(), z.url()).nullish(),
+  /** Admin-only in API responses (§4 v2). */
+  bankDetails: z.record(z.string(), z.string().max(200)).nullish(),
   notes: z.string().max(5000).nullish(),
 });
 export const ownerUpdate = ownerCreate.partial();

@@ -122,6 +122,8 @@ export const users = pgTable("users", {
   phone: text("phone"),
   name: text("name"),
   role: userRole("role").notNull().default("viewer"),
+  passwordHash: text("password_hash"),
+  avatarDocumentId: uuid("avatar_document_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -150,6 +152,11 @@ export const owners = pgTable("owners", {
   name: text("name").notNull(),
   isFamily: boolean("is_family").notNull().default(false),
   contactId: uuid("contact_id").references(() => contacts.id),
+  email: text("email"),
+  phones: text("phones").array(),
+  socialLinks: jsonb("social_links"),
+  /** Returned by the API to admins only; never sent to viewers (§4 v2). */
+  bankDetails: jsonb("bank_details"),
   notes: text("notes"),
 });
 
@@ -178,6 +185,7 @@ export const properties = pgTable("properties", {
   ),
   managerContactId: uuid("manager_contact_id").references(() => contacts.id),
   coverPhotoId: uuid("cover_photo_id"),
+  createdBy: uuid("created_by").references(() => users.id),
   description: text("description"),
   notes: text("notes"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -292,6 +300,7 @@ export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
   propertyId: uuid("property_id").references(() => properties.id),
   contactId: uuid("contact_id").references(() => contacts.id),
+  ownerId: uuid("owner_id").references(() => owners.id),
   category: documentCategory("category").notNull().default("other"),
   blobUrl: text("blob_url").notNull(),
   filename: text("filename").notNull(),
@@ -371,6 +380,15 @@ export const auditLog = pgTable("audit_log", {
   entityId: text("entity_id"),
   diff: jsonb("diff"),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const loginAttempts = pgTable("login_attempts", {
+  identifier: text("identifier").primaryKey(),
+  failedCount: integer("failed_count").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const settings = pgTable("settings", {

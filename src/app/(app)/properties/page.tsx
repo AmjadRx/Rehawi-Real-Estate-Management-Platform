@@ -33,6 +33,8 @@ export default async function PropertiesPage({
   const country = typeof params.country === "string" ? params.country : "";
   const occupancy =
     typeof params.occupancy === "string" ? params.occupancy : "";
+  const city = typeof params.city === "string" ? params.city : "";
+  const sort = typeof params.sort === "string" ? params.sort : "date";
 
   const filtered = summary.properties.filter((sp) => {
     const p = sp.property;
@@ -40,12 +42,43 @@ export default async function PropertiesPage({
     if (type && p.type !== type) return false;
     if (status && p.status !== status) return false;
     if (country && p.country !== country) return false;
+    if (city && p.city !== city) return false;
     if (occupancy && p.occupancy !== occupancy) return false;
     return true;
   });
 
+  // §6.3 v2 sort control
+  filtered.sort((a, b) => {
+    switch (sort) {
+      case "name":
+        return a.property.name.localeCompare(b.property.name);
+      case "location":
+        return (
+          a.property.country.localeCompare(b.property.country) ||
+          a.property.city.localeCompare(b.property.city)
+        );
+      case "price":
+        return (
+          parseFloat(b.property.purchasePrice ?? "0") -
+          parseFloat(a.property.purchasePrice ?? "0")
+        );
+      case "income":
+        return (
+          b.propertyFinancials.monthlyRunRate - a.propertyFinancials.monthlyRunRate
+        );
+      default:
+        return (
+          new Date(b.property.createdAt).getTime() -
+          new Date(a.property.createdAt).getTime()
+        );
+    }
+  });
+
   const countries = [
     ...new Set(summary.properties.map((sp) => sp.property.country)),
+  ].sort();
+  const cities = [
+    ...new Set(summary.properties.map((sp) => sp.property.city)),
   ].sort();
 
   return (
@@ -58,6 +91,7 @@ export default async function PropertiesPage({
       }))}
       baseCurrency={summary.baseCurrency}
       countries={countries}
+      cities={cities}
       owners={owners.map((o) => ({ id: o.id, name: o.name }))}
       isAdmin={user?.role === "admin"}
     />

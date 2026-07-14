@@ -1,30 +1,67 @@
 "use client";
 
-import { Building2, KeyRound, Loader2, MailCheck } from "lucide-react";
+import {
+  Building2,
+  KeyRound,
+  Loader2,
+  LockKeyhole,
+  MailCheck,
+  Smartphone,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { COUNTRIES } from "@/lib/countries";
 
-type Phase = "identifier" | "code";
+type Phase =
+  | "credentials" // email+password or phone entry
+  | "code" // 5-digit boxes (phone flow, or email first-time verification)
+  | "create-password"; // one-time setup after email verification
 
 const spring = { type: "spring", bounce: 0, visualDuration: 0.35 } as const;
 
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [phase, setPhase] = useState<Phase>("identifier");
-  const [identifier, setIdentifier] = useState("");
+
+  const [method, setMethod] = useState<"email" | "phone">("email");
+  const [phase, setPhase] = useState<Phase>("credentials");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [dial, setDial] = useState("+971:AE");
+  const [phone, setPhone] = useState("");
   const [digits, setDigits] = useState<string[]>(["", "", "", "", ""]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const boxes = useRef<Array<HTMLInputElement | null>>([]);
 
+  // Select values are "dial:ISO" so same-dial countries (US/CA) stay unique.
+  const dialCode = dial.split(":")[0];
+  const identifier =
+    method === "email"
+      ? email
+      : `${dialCode}${phone.replace(/\D/g, "").replace(/^0+/, "")}`;
+
+  const enterApp = useCallback(() => {
+    router.replace(params.get("next") ?? "/");
+    router.refresh();
+  }, [params, router]);
+
   const requestCode = useCallback(async () => {
-    if (!identifier.trim() || busy) return;
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -47,7 +84,36 @@ export function LoginForm() {
     } finally {
       setBusy(false);
     }
-  }, [identifier, busy]);
+  }, [busy, identifier]);
+
+  const loginWithPassword = useCallback(async () => {
+    if (busy || !email.trim() || !password) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        enterApp();
+        return;
+      }
+      if (data.needsSetup) {
+        setBusy(false);
+        setNotice("First sign-in: we are emailing you a verification code.");
+        await requestCode();
+        return;
+      }
+      setError(data.message ?? "Invalid email or password.");
+    } catch {
+      setError("Network error. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, email, password, enterApp, requestCode]);
 
   const verify = useCallback(
     async (code: string) => {
@@ -67,33 +133,58 @@ export function LoginForm() {
           boxes.current[0]?.focus();
           return;
         }
-        router.replace(params.get("next") ?? "/");
-        router.refresh();
+        // Email flow: first-time users create their password now (§3.2 v2)
+        if (method === "email" && !data.user?.passwordSet) {
+          setPhase("create-password");
+          return;
+        }
+        enterApp();
       } catch {
         setError("Network error. Check your connection and try again.");
       } finally {
         setBusy(false);
       }
     },
-    [busy, identifier, params, router],
+    [busy, identifier, method, enterApp],
   );
+
+  const savePassword = useCallback(async () => {
+    if (busy) return;
+    if (newPassword.length < 10) {
+      setError("Passwords need at least 10 characters.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.message ?? "Could not save the password.");
+        return;
+      }
+      enterApp();
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, newPassword, enterApp]);
 
   const setDigit = (index: number, value: string) => {
     const cleaned = value.replace(/\D/g, "");
     const next = [...digits];
-
     if (cleaned.length > 1) {
-      // paste: distribute the digits
       for (let i = 0; i < 5 - index; i++) next[index + i] = cleaned[i] ?? "";
       setDigits(next);
-      const last = Math.min(index + cleaned.length, 4);
-      boxes.current[last]?.focus();
+      boxes.current[Math.min(index + cleaned.length, 4)]?.focus();
     } else {
       next[index] = cleaned;
       setDigits(next);
       if (cleaned && index < 4) boxes.current[index + 1]?.focus();
     }
-
     const code = next.join("");
     if (code.length === 5) verify(code);
   };
@@ -124,13 +215,94 @@ export function LoginForm() {
       </div>
 
       <div className="rounded-2xl border bg-card p-6 shadow-sm">
+        {phase === "credentials" && (
+          <Tabs
+            value={method}
+            onValueChange={(v) => {
+              setMethod(v as "email" | "phone");
+              setError(null);
+            }}
+          >
+            <TabsList className="mb-4 grid w-full grid-cols-2">
+              <TabsTrigger value="email" className="gap-1.5">
+                <MailCheck className="size-4" aria-hidden />
+                Email
+              </TabsTrigger>
+              <TabsTrigger value="phone" className="gap-1.5">
+                <Smartphone className="size-4" aria-hidden />
+                Phone
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
         <AnimatePresence mode="wait" initial={false}>
-          {phase === "identifier" ? (
+          {phase === "credentials" && method === "email" && (
             <motion.form
-              key="identifier"
+              key="email"
               initial={{ opacity: 0, transform: "translateX(-16px)" }}
               animate={{ opacity: 1, transform: "translateX(0px)" }}
               exit={{ opacity: 0, transform: "translateX(-16px)" }}
+              transition={spring}
+              onSubmit={(e) => {
+                e.preventDefault();
+                loginWithPassword();
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@family.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
+                  className="h-11 text-base"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Password</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-11 text-base"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="h-11 w-full text-base"
+                disabled={busy || !email.trim() || !password}
+              >
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <LockKeyhole className="size-4" aria-hidden />
+                )}
+                Sign in
+              </Button>
+              <button
+                type="button"
+                onClick={requestCode}
+                disabled={busy || !email.trim()}
+                className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline disabled:opacity-50"
+              >
+                First time here, or forgot your password? Get a code.
+              </button>
+            </motion.form>
+          )}
+
+          {phase === "credentials" && method === "phone" && (
+            <motion.form
+              key="phone"
+              initial={{ opacity: 0, transform: "translateX(16px)" }}
+              animate={{ opacity: 1, transform: "translateX(0px)" }}
+              exit={{ opacity: 0, transform: "translateX(16px)" }}
               transition={spring}
               onSubmit={(e) => {
                 e.preventDefault();
@@ -139,41 +311,65 @@ export function LoginForm() {
               className="space-y-4"
             >
               <div className="space-y-2">
-                <Label htmlFor="identifier">Email or phone number</Label>
-                <Input
-                  id="identifier"
-                  name="identifier"
-                  autoComplete="email"
-                  inputMode="email"
-                  placeholder="you@family.com or +9715…"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  autoFocus
-                  className="h-11 text-base"
-                />
+                <Label htmlFor="login-phone">Phone number</Label>
+                <div className="flex gap-2">
+                  <Select value={dial} onValueChange={setDial}>
+                    <SelectTrigger
+                      className="h-11 w-[130px] shrink-0"
+                      aria-label="Country code"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.dial + ":" + c.code}>
+                          <span className="flex items-center gap-2">
+                            <span aria-hidden>{c.flag}</span>
+                            <span className="tabular-numbers">{c.dial}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="login-phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel-national"
+                    placeholder="50 123 4567"
+                    value={phone}
+                    onChange={(e) =>
+                      setPhone(e.target.value.replace(/[^\d\s]/g, ""))
+                    }
+                    className="h-11 text-base"
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Phone numbers in international format, e.g. +49 or +971.
+                  We will text a 5-digit code to {dialCode}{" "}
+                  {phone || "your number"}.
                 </p>
               </div>
               <Button
                 type="submit"
                 className="h-11 w-full text-base"
-                disabled={busy || !identifier.trim()}
+                disabled={busy || phone.replace(/\D/g, "").length < 6}
               >
                 {busy ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (
-                  <MailCheck className="size-4" aria-hidden />
+                  <Smartphone className="size-4" aria-hidden />
                 )}
                 Send code
               </Button>
             </motion.form>
-          ) : (
+          )}
+
+          {phase === "code" && (
             <motion.div
               key="code"
               initial={{ opacity: 0, transform: "translateX(16px)" }}
               animate={{ opacity: 1, transform: "translateX(0px)" }}
-              exit={{ opacity: 0, transform: "translateX(16px)" }}
+              exit={{ opacity: 0, transform: "translateX(-16px)" }}
               transition={spring}
               className="space-y-4"
             >
@@ -211,7 +407,7 @@ export function LoginForm() {
               {busy && (
                 <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" aria-hidden />
-                  Verifying…
+                  Verifying
                 </p>
               )}
 
@@ -220,11 +416,11 @@ export function LoginForm() {
                   type="button"
                   className="text-muted-foreground underline-offset-4 hover:underline"
                   onClick={() => {
-                    setPhase("identifier");
+                    setPhase("credentials");
                     setError(null);
                   }}
                 >
-                  Use a different contact
+                  Go back
                 </button>
                 <button
                   type="button"
@@ -236,6 +432,52 @@ export function LoginForm() {
                 </button>
               </div>
             </motion.div>
+          )}
+
+          {phase === "create-password" && (
+            <motion.form
+              key="create-password"
+              initial={{ opacity: 0, transform: "translateX(16px)" }}
+              animate={{ opacity: 1, transform: "translateX(0px)" }}
+              exit={{ opacity: 0 }}
+              transition={spring}
+              onSubmit={(e) => {
+                e.preventDefault();
+                savePassword();
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1 text-center">
+                <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <LockKeyhole className="size-5" aria-hidden />
+                </div>
+                <p className="text-sm font-medium">Create your password</p>
+                <p className="text-xs text-muted-foreground">
+                  Email verified. Choose a password of 10 or more characters
+                  for future sign-ins.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoFocus
+                  className="h-11 text-base"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="h-11 w-full text-base"
+                disabled={busy || newPassword.length < 10}
+              >
+                {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                Save and continue
+              </Button>
+            </motion.form>
           )}
         </AnimatePresence>
 

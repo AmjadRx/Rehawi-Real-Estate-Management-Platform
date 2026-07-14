@@ -1,0 +1,61 @@
+{
+  "app": {
+    "name": "عقارات رحاوي",
+    "tagline": "محفظة العائلة"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "properties": "العقارات",
+    "worldMap": "خريطة العالم",
+    "owners": "الملّاك",
+    "directory": "الدليل",
+    "admin": "الإدارة",
+    "settings": "الإعدادات",
+    "signOut": "تسجيل الخروج"
+  },
+  "dashboard": {
+    "title": "محفظة العائلة",
+    "propertiesSummary": "{count} عقارات: {completed} مكتمل، {underConstruction} قيد الإنشاء، {planned} مخطط",
+    "totalInvested": "إجمالي الاستثمار",
+    "totalReturned": "إجمالي العائد",
+    "monthlyIncome": "الدخل الشهري",
+    "yearlyIncome": "الدخل السنوي",
+    "outstanding": "الالتزامات المتبقية",
+    "fullReturn": "الوقت المقدر لاسترداد الاستثمار",
+    "projectedDate": "التاريخ المتوقع: {date}",
+    "needsAttention": "يتطلب الانتباه",
+    "incomeVsExpenses": "الدخل مقابل المصروفات",
+    "chartCaption": "آخر 12 شهرا، حصة العائلة، بعملة {currency}",
+    "recentActivity": "النشاط الأخير",
+    "activityEmpty": "ستظهر التغييرات هنا."
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "subtitle": "ملفك الشخصي وتفضيلات التطبيق.",
+    "profile": "الملف الشخصي",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "photo": "الصورة الشخصية",
+    "changePhoto": "تغيير الصورة",
+    "save": "حفظ الملف الشخصي",
+    "saved": "تم حفظ الملف الشخصي.",
+    "language": "اللغة",
+    "languageHint": "يُطبق فورا في جميع أنحاء التطبيق.",
+    "english": "الإنجليزية",
+    "arabic": "العربية",
+    "password": "كلمة المرور",
+    "passwordHint": "لتسجيل الدخول بالبريد الإلكتروني. 10 أحرف على الأقل.",
+    "newPassword": "كلمة مرور جديدة",
+    "savePassword": "حفظ كلمة المرور",
+    "passwordSaved": "تم حفظ كلمة المرور.",
+    "signedInAs": "مسجل الدخول باسم {identifier} ({role})"
+  },
+  "common": {
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ",
+    "notSet": "غير محدد",
+    "notYetGenerating": "لا يدرّ دخلا بعد",
+    "fullyReturned": "تم الاسترداد بالكامل"
+  }
+}

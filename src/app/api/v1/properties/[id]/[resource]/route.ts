@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { apiHandler, jsonError, jsonOk, parseBody } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin, requireUser } from "@/lib/auth/guard";
+import { requireUser } from "@/lib/auth/guard";
+import { requireCanEditProperty } from "@/lib/auth/permissions";
 import { getSubresource } from "@/lib/subresources";
 
 type Ctx = { params: Promise<{ id: string; resource: string }> };
@@ -22,8 +23,9 @@ export const GET = apiHandler(async (_request: NextRequest, { params }: Ctx) => 
 });
 
 export const POST = apiHandler(async (request: NextRequest, { params }: Ctx) => {
-  const user = await requireAdmin();
+  const user = await requireUser();
   const { id, resource } = await params;
+  await requireCanEditProperty(user, id);
   const sub = getSubresource(resource);
   if (!sub) return jsonError(404, "Unknown resource.");
   const data = await parseBody(request, sub.create);
