@@ -1,0 +1,282 @@
+/**
+ * Financial engine (§5) — pure functions, no I/O.
+ *
+ * Every amount is stored untouched in its original currency; conversion to
+ * the base display currency happens here, at computation time, using the
+ * `exchange_rates` table (rate_to_eur per currency). All ratio figures are
+ * recomputed from converted sums — never averaged.
+ */
+
+export type Money = { amount: string | number; currency: string };
+
+export type PaymentInput = Money;
+export type InstallmentInput = Money & {
+  status: "upcoming" | "due" | "paid" | "overdue";
+};
+export type LeaseInput = {
+  rentAmount: string | number;
+  currency: string;
+  frequency: "monthly" | "quarterly" | "yearly";
+  status: "active" | "ended";
+};
+export type IncomeInput = Money & { receivedOn: string | Date };
+export type ExpenseInput = Money & {
+  spentOn: string | Date;
+  recurring: boolean;
+};
+
+/** currency code → rate to EUR (EUR itself must be 1). */
+export type RateTable = Record<string, number>;
+
+export interface PropertyFinancialInputs {
+  payments: PaymentInput[];
+  installments: InstallmentInput[];
+  leases: LeaseInput[];
+  income: IncomeInput[];
+  expenses: ExpenseInput[];
+  currentValue?: Money | null;
+}
+
+export interface PropertyFinancials {
+  /** Σ payments — money put in (base currency). */
+  invested: number;
+  /** Σ unpaid installments (upcoming | due | overdue). */
+  outstanding: number;
+  /** invested ÷ (invested + outstanding); 1 when nothing outstanding. */
+  completionPct: number;
+  grossIncome: number;
+  operatingExpenses: number;
+  /** grossIncome − operatingExpenses (NOI). */
+  netIncome: number;
+  /** Cumulative net income to date. */
+  totalReturned: number;
+  /** Active leases normalized to monthly − average monthly recurring expenses. */
+  monthlyRunRate: number;
+  annualRunRate: number;
+  /** totalReturned ÷ invested; 0 when nothing invested. */
+  roiToDate: number;
+  /** annual NOI run-rate ÷ current value; null when no current value. */
+  capRate: number | null;
+  /**
+   * Months until (invested − returned) is repaid by the monthly run-rate.
+   * null when the run-rate is ≤ 0 ("Not yet generating income").
+   */
+  paybackMonths: number | null;
+  currentValue: number | null;
+}
+
+const MONTHS_PER_PERIOD: Record<LeaseInput["frequency"], number> = {
+  monthly: 1,
+  quarterly: 3,
+  yearly: 12,
+};
+
+export function toNumber(v: string | number): number {
+  const n = typeof v === "number" ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Convert an amount to the base currency through EUR cross rates.
+ * Unknown currencies convert at 0 — deliberately visible in the UI rather
+ * than silently wrong; the admin rates screen exists to fix them.
+ */
+export function convert(
+  money: Money,
+  rates: RateTable,
+  baseCurrency = "EUR",
+): number {
+  const amount = toNumber(money.amount);
+  const from = rates[money.currency.toUpperCase()];
+  const base = rates[baseCurrency.toUpperCase()];
+  if (from === undefined || !base) return 0;
+  return (amount * from) / base;
+}
+
+const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+
+export function totalInvested(
+  payments: PaymentInput[],
+  rates: RateTable,
+  base = "EUR",
+): number {
+  return sum(payments.map((p) => convert(p, rates, base)));
+}
+
+export function outstandingCommitment(
+  installments: InstallmentInput[],
+  rates: RateTable,
+  base = "EUR",
+): number {
+  return sum(
+    installments
+      .filter((i) => i.status !== "paid")
+      .map((i) => convert(i, rates, base)),
+  );
+}
+
+export function monthlyRentRunRate(
+  leases: LeaseInput[],
+  rates: RateTable,
+  base = "EUR",
+): number {
+  return sum(
+    leases
+      .filter((l) => l.status === "active")
+      .map(
+        (l) =>
+          convert({ amount: l.rentAmount, currency: l.currency }, rates, base) /
+          MONTHS_PER_PERIOD[l.frequency],
+      ),
+  );
+}
+
+/** Average monthly recurring expenses over the trailing 12 months. */
+export function monthlyRecurringExpenses(
+  expenses: ExpenseInput[],
+  rates: RateTable,
+  base = "EUR",
+  now: Date = new Date(),
+): number {
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - 12);
+  const recent = expenses.filter(
+    (e) => e.recurring && new Date(e.spentOn) >= cutoff,
+  );
+  return sum(recent.map((e) => convert(e, rates, base))) / 12;
+}
+
+export function computePropertyFinancials(
+  inputs: PropertyFinancialInputs,
+  rates: RateTable,
+  base = "EUR",
+  now: Date = new Date(),
+): PropertyFinancials {
+  const invested = totalInvested(inputs.payments, rates, base);
+  const outstanding = outstandingCommitment(inputs.installments, rates, base);
+  const grossIncome = sum(inputs.income.map((i) => convert(i, rates, base)));
+  const operatingExpenses = sum(
+    inputs.expenses.map((e) => convert(e, rates, base)),
+  );
+  const netIncome = grossIncome - operatingExpenses;
+  const totalReturned = netIncome;
+
+  const monthlyRunRate =
+    monthlyRentRunRate(inputs.leases, rates, base) -
+    monthlyRecurringExpenses(inputs.expenses, rates, base, now);
+  const annualRunRate = monthlyRunRate * 12;
+
+  const committed = invested + outstanding;
+  const completionPct = committed > 0 ? invested / committed : 1;
+  const roiToDate = invested > 0 ? totalReturned / invested : 0;
+
+  const currentValue = inputs.currentValue
+    ? convert(inputs.currentValue, rates, base)
+    : null;
+  const capRate =
+    currentValue && currentValue > 0 ? annualRunRate / currentValue : null;
+
+  const paybackMonths =
+    monthlyRunRate > 0
+      ? Math.max(0, (invested - totalReturned) / monthlyRunRate)
+      : null;
+
+  return {
+    invested,
+    outstanding,
+    completionPct,
+    grossIncome,
+    operatingExpenses,
+    netIncome,
+    totalReturned,
+    monthlyRunRate,
+    annualRunRate,
+    roiToDate,
+    capRate,
+    paybackMonths,
+    currentValue,
+  };
+}
+
+/** Scale a property's figures by an ownership share (0–100). */
+export function scaleByShare(
+  f: PropertyFinancials,
+  sharePct: number,
+): PropertyFinancials {
+  const s = sharePct / 100;
+  const invested = f.invested * s;
+  const outstanding = f.outstanding * s;
+  const totalReturned = f.totalReturned * s;
+  const monthlyRunRate = f.monthlyRunRate * s;
+  return {
+    ...f,
+    invested,
+    outstanding,
+    grossIncome: f.grossIncome * s,
+    operatingExpenses: f.operatingExpenses * s,
+    netIncome: f.netIncome * s,
+    totalReturned,
+    monthlyRunRate,
+    annualRunRate: monthlyRunRate * 12,
+    completionPct: f.completionPct, // ratio: share-invariant
+    roiToDate: f.roiToDate, // ratio: share-invariant
+    capRate: f.capRate,
+    currentValue: f.currentValue !== null ? f.currentValue * s : null,
+    paybackMonths:
+      monthlyRunRate > 0
+        ? Math.max(0, (invested - totalReturned) / monthlyRunRate)
+        : null,
+  };
+}
+
+/** Aggregate several (already share-scaled) property figures into a portfolio. */
+export function aggregateFinancials(
+  items: PropertyFinancials[],
+): PropertyFinancials {
+  const invested = sum(items.map((i) => i.invested));
+  const outstanding = sum(items.map((i) => i.outstanding));
+  const grossIncome = sum(items.map((i) => i.grossIncome));
+  const operatingExpenses = sum(items.map((i) => i.operatingExpenses));
+  const netIncome = grossIncome - operatingExpenses;
+  const totalReturned = sum(items.map((i) => i.totalReturned));
+  const monthlyRunRate = sum(items.map((i) => i.monthlyRunRate));
+  const values = items
+    .map((i) => i.currentValue)
+    .filter((v): v is number => v !== null);
+  const currentValue = values.length ? sum(values) : null;
+  const annualRunRate = monthlyRunRate * 12;
+  const committed = invested + outstanding;
+  return {
+    invested,
+    outstanding,
+    completionPct: committed > 0 ? invested / committed : 1,
+    grossIncome,
+    operatingExpenses,
+    netIncome,
+    totalReturned,
+    monthlyRunRate,
+    annualRunRate,
+    roiToDate: invested > 0 ? totalReturned / invested : 0,
+    capRate:
+      currentValue && currentValue > 0 ? annualRunRate / currentValue : null,
+    paybackMonths:
+      monthlyRunRate > 0
+        ? Math.max(0, (invested - totalReturned) / monthlyRunRate)
+        : null,
+    currentValue,
+  };
+}
+
+/**
+ * Render payback months as "X years Y months", or the honest fallback when
+ * the portfolio is not generating income.
+ */
+export function formatPayback(paybackMonths: number | null): string {
+  if (paybackMonths === null) return "Not yet generating income";
+  if (paybackMonths === 0) return "Fully returned";
+  const years = Math.floor(paybackMonths / 12);
+  const months = Math.round(paybackMonths % 12);
+  if (years === 0) return `${months} month${months === 1 ? "" : "s"}`;
+  if (months === 0) return `${years} year${years === 1 ? "" : "s"}`;
+  return `${years} year${years === 1 ? "" : "s"} ${months} month${months === 1 ? "" : "s"}`;
+}
