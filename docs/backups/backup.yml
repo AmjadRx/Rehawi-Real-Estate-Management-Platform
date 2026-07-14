@@ -1,0 +1,70 @@
+# Nightly encrypted backup of the Rehawi Estates database + Blob files.
+# Lives in the PRIVATE rehawi-estates-backups repository (§10.4).
+name: Nightly backup
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # 03:30 UTC nightly
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client age jq
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          STAMP=$(date -u +%F)
+          mkdir -p db
+          pg_dump --format=custom --no-owner "$DATABASE_URL" -f "db/backup-$STAMP.pgsql"
+
+      - name: Encrypt dump
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          STAMP=$(date -u +%F)
+          echo "$BACKUP_PASSPHRASE" | age -p -o "db/backup-$STAMP.pgsql.age" "db/backup-$STAMP.pgsql" \
+            || AGE_PASSPHRASE="$BACKUP_PASSPHRASE" age -e -p -o "db/backup-$STAMP.pgsql.age" "db/backup-$STAMP.pgsql"
+          rm "db/backup-$STAMP.pgsql"
+
+      - name: Snapshot Blob documents not yet backed up
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          mkdir -p files
+          psql "$DATABASE_URL" -t -A -F ',' \
+            -c "select id, blob_url from documents where deleted_at is null and blob_url not like 'fs:%'" |
+          while IFS=',' read -r id url; do
+            [ -z "$id" ] && continue
+            target="files/$id.age"
+            if [ ! -f "$target" ]; then
+              echo "backing up document $id"
+              curl -sfL -H "authorization: Bearer $BLOB_READ_WRITE_TOKEN" "$url" -o /tmp/blob.bin || continue
+              echo "$BACKUP_PASSPHRASE" | age -p -o "$target" /tmp/blob.bin
+              rm -f /tmp/blob.bin
+            fi
+          done
+
+      - name: Prune dumps older than 90 days
+        run: find db -name 'backup-*.age' -mtime +90 -delete
+
+      - name: Commit
+        run: |
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Nightly backup $(date -u +%F)"
+          git push
