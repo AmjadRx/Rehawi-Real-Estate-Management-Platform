@@ -1,0 +1,5 @@
+# Motion AI Kit skills are license-gated Motion+ content — install locally
+# with `npx motion-ai` (see README). Not committed to this public repo.
+.claude/skills/motion/
+
+node_modules/
