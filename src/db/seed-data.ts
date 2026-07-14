@@ -194,10 +194,14 @@ export async function seed(db: Database) {
     })
     .returning();
 
+  // All three assets are fully family-owned so the Family profile matches
+  // the §5 worked example exactly (€3,000,000 invested). The partner company
+  // exists in the owners directory for future co-owned deals.
+  void partnerCo;
   await db.insert(t.propertyOwners).values([
     { propertyId: tower.id, ownerId: amjad.id, sharePct: "40", isLegalOwner: false },
     { propertyId: tower.id, ownerId: father.id, sharePct: "40", isLegalOwner: true },
-    { propertyId: tower.id, ownerId: partnerCo.id, sharePct: "20", isLegalOwner: false },
+    { propertyId: tower.id, ownerId: sister.id, sharePct: "20", isLegalOwner: false },
   ]);
 
   await db.insert(t.payments).values([

@@ -7,7 +7,6 @@ async function main() {
     console.error("Seeds are development-only. Refusing to run.");
     process.exit(1);
   }
-  process.env.NODE_ENV = process.env.NODE_ENV || "development";
   const { getDb } = await import("./index");
   const { seed } = await import("./seed-data");
   const db = await getDb();

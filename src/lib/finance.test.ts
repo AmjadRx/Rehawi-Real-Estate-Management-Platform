@@ -12,13 +12,21 @@ import {
 const rates: RateTable = { EUR: 1, USD: 0.9, AED: 0.25 };
 const NOW = new Date("2026-07-01T00:00:00Z");
 
+import type {
+  ExpenseInput,
+  IncomeInput,
+  InstallmentInput,
+  LeaseInput,
+  PaymentInput,
+} from "./finance";
+
 const empty = {
-  payments: [],
-  installments: [],
-  leases: [],
-  income: [],
-  expenses: [],
-} as const;
+  payments: [] as PaymentInput[],
+  installments: [] as InstallmentInput[],
+  leases: [] as LeaseInput[],
+  income: [] as IncomeInput[],
+  expenses: [] as ExpenseInput[],
+};
 
 describe("convert", () => {
   it("converts through EUR cross rates", () => {

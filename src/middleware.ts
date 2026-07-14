@@ -36,8 +36,16 @@ export async function middleware(request: NextRequest) {
 
   if (isPublic(pathname)) return NextResponse.next();
 
-  // Session from httpOnly cookie (web) or Authorization: Bearer (native app)
+  // Vercel Cron (§7): the rates-refresh endpoint may authenticate with the
+  // CRON_SECRET bearer token instead of a session. The route re-checks it.
   const bearer = request.headers.get("authorization");
+  if (
+    pathname === "/api/v1/rates/refresh" &&
+    process.env.CRON_SECRET &&
+    bearer === `Bearer ${process.env.CRON_SECRET}`
+  ) {
+    return NextResponse.next();
+  }
   const token =
     request.cookies.get(SESSION_COOKIE)?.value ??
     (bearer?.startsWith("Bearer ") ? bearer.slice(7) : undefined);

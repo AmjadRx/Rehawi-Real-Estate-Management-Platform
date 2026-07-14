@@ -3,6 +3,7 @@
 import { MotionConfig } from "motion/react";
 import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 /**
  * App-wide client providers.
@@ -19,7 +20,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <MotionConfig reducedMotion="user">
-      {children}
+      <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
       <Toaster position="top-center" richColors />
     </MotionConfig>
   );
