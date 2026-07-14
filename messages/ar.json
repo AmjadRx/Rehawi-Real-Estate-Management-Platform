@@ -25,6 +25,8 @@
     "projectedDate": "التاريخ المتوقع: {date}",
     "needsAttention": "يتطلب الانتباه",
     "incomeVsExpenses": "الدخل مقابل المصروفات",
+    "income": "الدخل",
+    "expenses": "المصروفات",
     "chartCaption": "آخر 12 شهرا، حصة العائلة، بعملة {currency}",
     "recentActivity": "النشاط الأخير",
     "activityEmpty": "ستظهر التغييرات هنا."
@@ -56,6 +58,9 @@
     "saving": "جارٍ الحفظ",
     "notSet": "غير محدد",
     "notYetGenerating": "لا يدرّ دخلا بعد",
-    "fullyReturned": "تم الاسترداد بالكامل"
+    "fullyReturned": "تم الاسترداد بالكامل",
+    "paybackYears": "{years, plural, one {سنة واحدة} two {سنتان} few {# سنوات} many {# سنة} other {# سنة}}",
+    "paybackMonths": "{months, plural, one {شهر واحد} two {شهران} few {# أشهر} many {# شهرا} other {# شهر}}",
+    "paybackBoth": "{years, plural, one {سنة واحدة} two {سنتان} few {# سنوات} many {# سنة} other {# سنة}} و{months, plural, one {شهر واحد} two {شهران} few {# أشهر} many {# شهرا} other {# شهر}}"
   }
 }

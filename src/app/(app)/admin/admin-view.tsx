@@ -517,7 +517,7 @@ export function AdminView({
                     {row.entityType.replace(/_/g, " ")}
                   </TableCell>
                   <TableCell className="hidden max-w-40 truncate font-mono text-xs text-muted-foreground md:table-cell">
-                    {row.entityId ?? "—"}
+                    {row.entityId ?? "-"}
                   </TableCell>
                 </TableRow>
               ))}

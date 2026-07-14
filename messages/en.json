@@ -25,6 +25,8 @@
     "projectedDate": "Projected: {date}",
     "needsAttention": "Needs attention",
     "incomeVsExpenses": "Income vs expenses",
+    "income": "Income",
+    "expenses": "Expenses",
     "chartCaption": "Last 12 months, family share, in {currency}",
     "recentActivity": "Recent activity",
     "activityEmpty": "Changes will appear here."
@@ -56,6 +58,9 @@
     "saving": "Saving",
     "notSet": "Not set",
     "notYetGenerating": "Not yet generating income",
-    "fullyReturned": "Fully returned"
+    "fullyReturned": "Fully returned",
+    "paybackYears": "{years, plural, one {# year} other {# years}}",
+    "paybackMonths": "{months, plural, one {# month} other {# months}}",
+    "paybackBoth": "{years, plural, one {# year} other {# years}}, {months, plural, one {# month} other {# months}}"
   }
 }

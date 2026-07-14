@@ -54,14 +54,12 @@ export function PropertiesView({
   countries,
   cities,
   owners,
-  isAdmin,
 }: {
   items: Item[];
   baseCurrency: string;
   countries: string[];
   cities: string[];
   owners: Array<{ id: string; name: string }>;
-  isAdmin: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -193,7 +191,7 @@ export function PropertiesView({
           <div>
             <p className="font-medium">No properties match</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Try clearing a filter{isAdmin ? " or add your first property" : ""}.
+              Try clearing a filter or add your first property.
             </p>
           </div>
         </FadeIn>

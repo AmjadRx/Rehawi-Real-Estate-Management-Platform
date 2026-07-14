@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { currentUser } from "@/lib/auth/guard";
 import { portfolioSummary } from "@/lib/portfolio";
 import { getDb, tables } from "@/db";
 import { asc } from "drizzle-orm";
@@ -17,8 +16,7 @@ export default async function PropertiesPage({
   const ownerFilter =
     typeof params.owner === "string" && params.owner ? params.owner : "all";
 
-  const [user, summary, db] = await Promise.all([
-    currentUser(),
+  const [summary, db] = await Promise.all([
     portfolioSummary(ownerFilter),
     getDb(),
   ]);
@@ -93,7 +91,6 @@ export default async function PropertiesPage({
       countries={countries}
       cities={cities}
       owners={owners.map((o) => ({ id: o.id, name: o.name }))}
-      isAdmin={user?.role === "admin"}
     />
   );
 }

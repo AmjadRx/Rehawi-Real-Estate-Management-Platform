@@ -268,15 +268,46 @@ export function aggregateFinancials(
 }
 
 /**
- * Render payback months as "X years Y months", or the honest fallback when
+ * Split payback months into calendar parts. Uncapped (§6.2 v2): a 499-year
+ * payback is reported as-is, never clamped to a "99+ years" style cap.
+ */
+export function paybackParts(
+  paybackMonths: number | null,
+): { kind: "none" } | { kind: "done" } | { kind: "time"; years: number; months: number } {
+  if (paybackMonths === null) return { kind: "none" };
+  const total = Math.round(paybackMonths);
+  if (total <= 0) return { kind: "done" };
+  return { kind: "time", years: Math.floor(total / 12), months: total % 12 };
+}
+
+/**
+ * Render payback months as "X years, Y months", or the honest fallback when
  * the portfolio is not generating income.
  */
 export function formatPayback(paybackMonths: number | null): string {
-  if (paybackMonths === null) return "Not yet generating income";
-  if (paybackMonths === 0) return "Fully returned";
-  const years = Math.floor(paybackMonths / 12);
-  const months = Math.round(paybackMonths % 12);
-  if (years === 0) return `${months} month${months === 1 ? "" : "s"}`;
-  if (months === 0) return `${years} year${years === 1 ? "" : "s"}`;
-  return `${years} year${years === 1 ? "" : "s"} ${months} month${months === 1 ? "" : "s"}`;
+  const parts = paybackParts(paybackMonths);
+  if (parts.kind === "none") return "Not yet generating income";
+  if (parts.kind === "done") return "Fully returned";
+  const { years, months } = parts;
+  const y = `${years} year${years === 1 ? "" : "s"}`;
+  const m = `${months} month${months === 1 ? "" : "s"}`;
+  if (years === 0) return m;
+  if (months === 0) return y;
+  return `${y}, ${m}`;
+}
+
+/**
+ * Projected calendar date when the invested capital is fully returned
+ * (§6.2 v2), or null when nothing is being generated / already returned.
+ */
+export function paybackDate(
+  paybackMonths: number | null,
+  from: Date = new Date(),
+): Date | null {
+  if (paybackMonths === null) return null;
+  const total = Math.round(paybackMonths);
+  if (total <= 0) return null;
+  const d = new Date(from.getTime());
+  d.setMonth(d.getMonth() + total);
+  return d;
 }
