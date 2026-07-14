@@ -36,11 +36,12 @@ export async function middleware(request: NextRequest) {
 
   if (isPublic(pathname)) return NextResponse.next();
 
-  // Vercel Cron (§7): the rates-refresh endpoint may authenticate with the
-  // CRON_SECRET bearer token instead of a session. The route re-checks it.
+  // Vercel Cron (§7/§13.9): cron endpoints may authenticate with the
+  // CRON_SECRET bearer token instead of a session. The routes re-check it.
   const bearer = request.headers.get("authorization");
+  const CRON_PATHS = ["/api/v1/rates/refresh", "/api/v1/reminders/generate"];
   if (
-    pathname === "/api/v1/rates/refresh" &&
+    CRON_PATHS.includes(pathname) &&
     process.env.CRON_SECRET &&
     bearer === `Bearer ${process.env.CRON_SECRET}`
   ) {

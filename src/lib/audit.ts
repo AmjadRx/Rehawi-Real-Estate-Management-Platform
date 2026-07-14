@@ -1,4 +1,5 @@
 import { getDb, tables } from "@/db";
+import { ensureUserRow } from "@/lib/users";
 
 /**
  * §3.3: every create/update/delete is recorded with user, entity,
@@ -13,6 +14,7 @@ export async function writeAudit(params: {
   diff?: unknown;
 }): Promise<void> {
   try {
+    await ensureUserRow(params.userId);
     const db = await getDb();
     await db.insert(tables.auditLog).values({
       userId: params.userId,

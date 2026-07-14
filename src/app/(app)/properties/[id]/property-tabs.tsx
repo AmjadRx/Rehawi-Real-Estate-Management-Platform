@@ -2,7 +2,6 @@
 
 import {
   CalendarClock,
-  FileText,
   HardHat,
   Mail,
   MessageCircle,

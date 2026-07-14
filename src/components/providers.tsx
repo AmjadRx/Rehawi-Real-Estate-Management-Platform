@@ -2,6 +2,7 @@
 
 import { MotionConfig } from "motion/react";
 import { useEffect } from "react";
+import { PwaExtras } from "@/components/pwa-extras";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -22,6 +23,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <MotionConfig reducedMotion="user">
       <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
       <Toaster position="top-center" richColors />
+      <PwaExtras />
     </MotionConfig>
   );
 }

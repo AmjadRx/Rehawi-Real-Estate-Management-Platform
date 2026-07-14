@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
  * session first — no public URLs to contracts, ever (§3.3).
  */
 
-const useBlob = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+const blobConfigured = () => !!process.env.BLOB_READ_WRITE_TOKEN;
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB (§8)
 
@@ -34,7 +34,7 @@ export async function storeFile(
 ): Promise<StoredFile> {
   const safeName = `${randomUUID()}-${filename.replace(/[^\w.\-]+/g, "_")}`;
 
-  if (useBlob()) {
+  if (blobConfigured()) {
     const { put } = await import("@vercel/blob");
     const blob = await put(`documents/${safeName}`, data, {
       access: "public",

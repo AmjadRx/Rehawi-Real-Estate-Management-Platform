@@ -45,6 +45,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
   const stored = await storeFile(file.name, mime, await file.arrayBuffer());
 
+  const { ensureUserRow } = await import("@/lib/users");
+  await ensureUserRow(user.id);
   const db = await getDb();
   const [document] = await db
     .insert(tables.documents)

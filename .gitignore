@@ -40,3 +40,8 @@ next-env.d.ts
 
 # local dev data (PGlite database, dev file uploads)
 /.data/
+
+# serwist service worker build output
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker*.js
