@@ -26,14 +26,17 @@ async function createDb(): Promise<Database> {
   if (process.env.NODE_ENV === "production") {
     throw new Error("DATABASE_URL must be set in production");
   }
-  const [{ PGlite }, { drizzle: drizzlePglite }, { migrate }, path] =
+  const [{ PGlite }, { drizzle: drizzlePglite }, { migrate }, path, fs] =
     await Promise.all([
       import("@electric-sql/pglite"),
       import("drizzle-orm/pglite"),
       import("drizzle-orm/pglite/migrator"),
       import("node:path"),
+      import("node:fs"),
     ]);
-  const client = new PGlite(path.join(process.cwd(), ".data", "pg"));
+  const dataDir = path.join(process.cwd(), ".data", "pg");
+  fs.mkdirSync(dataDir, { recursive: true });
+  const client = new PGlite(dataDir);
   const db = drizzlePglite(client, { schema });
   await migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
   await maybeSeedDev(db);
@@ -52,7 +55,11 @@ async function maybeSeedDev(db: Database) {
 
 export function getDb(): Promise<Database> {
   if (!globalForDb.__rehawiDb) {
-    globalForDb.__rehawiDb = createDb();
+    globalForDb.__rehawiDb = createDb().catch((error) => {
+      // Don't cache a failed startup — let the next request retry.
+      globalForDb.__rehawiDb = undefined;
+      throw error;
+    });
   }
   return globalForDb.__rehawiDb;
 }
