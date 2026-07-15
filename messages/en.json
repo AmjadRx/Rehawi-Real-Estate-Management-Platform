@@ -15,7 +15,7 @@
   },
   "dashboard": {
     "title": "Family portfolio",
-    "propertiesSummary": "{count} properties: {completed} completed, {underConstruction} under construction, {planned} planned",
+    "propertiesSummary": "{count, number} properties: {completed, number} completed, {underConstruction, number} under construction, {planned, number} planned",
     "totalInvested": "Total invested",
     "totalReturned": "Total returned",
     "monthlyIncome": "Monthly income",

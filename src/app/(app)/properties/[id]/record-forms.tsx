@@ -110,7 +110,19 @@ export function AddRecordButton({
         {title}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="max-h-[90svh] overflow-y-auto sm:max-w-md"
+          // §16: keep the focused input visible above the on-screen keyboard.
+          onFocusCapture={(e) => {
+            const el = e.target as HTMLElement;
+            if (el.matches("input, textarea, select")) {
+              setTimeout(
+                () => el.scrollIntoView({ block: "center", behavior: "smooth" }),
+                120,
+              );
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
@@ -144,6 +156,7 @@ export function AddRecordButton({
                     id={`ar-${f.key}`}
                     type={f.kind === "date" ? "date" : "text"}
                     inputMode={f.kind === "amount" ? "decimal" : undefined}
+                    enterKeyHint="done"
                     value={values[f.key]}
                     onChange={(e) =>
                       setValues((s) => ({ ...s, [f.key]: e.target.value }))

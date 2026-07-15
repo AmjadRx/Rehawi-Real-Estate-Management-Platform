@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -40,6 +39,7 @@ import {
   PAYMENT_KIND_LABEL,
 } from "@/lib/labels";
 import type { PropertyDetail } from "@/lib/property-detail";
+import { CompletenessMeter } from "./completeness-meter";
 import { DocumentsPanel } from "./documents-panel";
 import { LocationPanel } from "./location-panel";
 import { AddRecordButton, type FieldDef } from "./record-forms";
@@ -75,6 +75,32 @@ function Empty({ children }: { children: React.ReactNode }) {
     <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
       {children}
     </p>
+  );
+}
+
+/** Key-facts entry: skipped fields display "Not provided" (§6.3 v3). */
+function Fact({
+  label,
+  value,
+  numeric = false,
+}: {
+  label: string;
+  value: string | null;
+  numeric?: boolean;
+}) {
+  return (
+    <div>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd
+        className={
+          value
+            ? `mt-0.5 font-medium ${numeric ? "tabular-numbers" : ""}`
+            : "mt-0.5 text-sm italic text-muted-foreground"
+        }
+      >
+        {value ?? "Not provided"}
+      </dd>
+    </div>
   );
 }
 
@@ -133,6 +159,9 @@ export function PropertyTabs({
   detail,
   canEdit,
   allContacts,
+  tab,
+  onTabChange,
+  onRequestEdit,
 }: {
   detail: PropertyDetail;
   canEdit: boolean;
@@ -142,6 +171,10 @@ export function PropertyTabs({
     role: string;
     companyName: string | null;
   }>;
+  /** Lifted so the completeness meter (§6.3 v3) can jump to any editor. */
+  tab: string;
+  onTabChange: (tab: string) => void;
+  onRequestEdit: () => void;
 }) {
   const { property, financials, baseCurrency } = detail;
   const showConstruction = property.status !== "completed";
@@ -162,11 +195,10 @@ export function PropertyTabs({
     { value: "maintenance", label: "Maintenance" },
   ];
 
-  const [tab, setTab] = useState("overview");
   const currency = property.currency;
 
   return (
-    <Tabs value={tab} onValueChange={setTab}>
+    <Tabs value={tab} onValueChange={onTabChange}>
       <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
         <TabsList className="w-max">
           {tabs.map((t) => (
@@ -188,6 +220,12 @@ export function PropertyTabs({
         >
           {tab === "overview" && (
             <>
+              <CompletenessMeter
+                detail={detail}
+                canEdit={canEdit}
+                onRequestEdit={onRequestEdit}
+                onOpenTab={onTabChange}
+              />
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatCard
                   label="Invested"
@@ -212,37 +250,46 @@ export function PropertyTabs({
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <Section title="Key facts">
+                  {/* §6.3 v3: skipped fields read "Not provided", never invented. */}
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                    {property.purchasePrice && (
-                      <div>
-                        <dt className="text-muted-foreground">Purchase price</dt>
-                        <dd className="mt-0.5 font-medium tabular-numbers">
-                          {formatMoney(property.purchasePrice, currency)}
-                        </dd>
-                      </div>
-                    )}
-                    {property.currentValue && (
-                      <div>
-                        <dt className="text-muted-foreground">Current value</dt>
-                        <dd className="mt-0.5 font-medium tabular-numbers">
-                          {formatMoney(property.currentValue, currency)}
-                        </dd>
-                      </div>
-                    )}
-                    {property.sizeSqm && (
-                      <div>
-                        <dt className="text-muted-foreground">Size</dt>
-                        <dd className="mt-0.5 font-medium">
-                          {formatNumber(parseFloat(property.sizeSqm))} m²
-                        </dd>
-                      </div>
-                    )}
-                    {property.yearBuilt && (
-                      <div>
-                        <dt className="text-muted-foreground">Year built</dt>
-                        <dd className="mt-0.5 font-medium">{property.yearBuilt}</dd>
-                      </div>
-                    )}
+                    <Fact
+                      label="Purchase price"
+                      value={
+                        property.purchasePrice
+                          ? formatMoney(property.purchasePrice, currency)
+                          : null
+                      }
+                      numeric
+                    />
+                    <Fact
+                      label="Current value"
+                      value={
+                        property.currentValue
+                          ? formatMoney(property.currentValue, currency)
+                          : null
+                      }
+                      numeric
+                    />
+                    <Fact
+                      label="Size"
+                      value={
+                        property.sizeSqm
+                          ? `${formatNumber(parseFloat(property.sizeSqm))} m²`
+                          : null
+                      }
+                    />
+                    <Fact
+                      label="Year built"
+                      value={property.yearBuilt ? String(property.yearBuilt) : null}
+                    />
+                    <Fact
+                      label="Floors"
+                      value={property.floors !== null ? formatNumber(property.floors) : null}
+                    />
+                    <Fact
+                      label="Units"
+                      value={property.units !== null ? formatNumber(property.units) : null}
+                    />
                     <div>
                       <dt className="text-muted-foreground">Location</dt>
                       <dd className="mt-0.5 font-medium">
@@ -255,9 +302,13 @@ export function PropertyTabs({
                       <dd className="mt-0.5 font-medium">{currency}</dd>
                     </div>
                   </dl>
-                  {property.description && (
+                  {property.description ? (
                     <p className="mt-4 border-t pt-3 text-sm leading-relaxed text-muted-foreground">
                       {property.description}
+                    </p>
+                  ) : (
+                    <p className="mt-4 border-t pt-3 text-sm italic text-muted-foreground">
+                      Description not provided.
                     </p>
                   )}
                 </Section>

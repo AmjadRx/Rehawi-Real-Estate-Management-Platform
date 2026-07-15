@@ -31,7 +31,15 @@ type Phase =
 
 const spring = { type: "spring", bounce: 0, visualDuration: 0.35 } as const;
 
-export function LoginForm() {
+export function LoginForm({
+  mode,
+  emailOtp,
+  phoneOtp,
+}: {
+  mode: "env_password" | "otp";
+  emailOtp: boolean;
+  phoneOtp: boolean;
+}) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -215,7 +223,7 @@ export function LoginForm() {
       </div>
 
       <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        {phase === "credentials" && (
+        {phase === "credentials" && phoneOtp && (
           <Tabs
             value={method}
             onValueChange={(v) => {
@@ -286,14 +294,22 @@ export function LoginForm() {
                 )}
                 Sign in
               </Button>
-              <button
-                type="button"
-                onClick={requestCode}
-                disabled={busy || !email.trim()}
-                className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline disabled:opacity-50"
-              >
-                First time here, or forgot your password? Get a code.
-              </button>
+              {emailOtp ? (
+                <button
+                  type="button"
+                  onClick={requestCode}
+                  disabled={busy || !email.trim()}
+                  className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline disabled:opacity-50"
+                >
+                  First time here, or forgot your password? Get a code.
+                </button>
+              ) : (
+                mode === "env_password" && (
+                  <p className="text-center text-xs text-muted-foreground">
+                    Forgot your password? Ask the family admin to reset it.
+                  </p>
+                )
+              )}
             </motion.form>
           )}
 

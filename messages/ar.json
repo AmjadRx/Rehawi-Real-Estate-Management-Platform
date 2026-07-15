@@ -15,7 +15,7 @@
   },
   "dashboard": {
     "title": "محفظة العائلة",
-    "propertiesSummary": "{count} عقارات: {completed} مكتمل، {underConstruction} قيد الإنشاء، {planned} مخطط",
+    "propertiesSummary": "{count, number} عقارات: {completed, number} مكتمل، {underConstruction, number} قيد الإنشاء، {planned, number} مخطط",
     "totalInvested": "إجمالي الاستثمار",
     "totalReturned": "إجمالي العائد",
     "monthlyIncome": "الدخل الشهري",
@@ -27,7 +27,7 @@
     "incomeVsExpenses": "الدخل مقابل المصروفات",
     "income": "الدخل",
     "expenses": "المصروفات",
-    "chartCaption": "آخر 12 شهرا، حصة العائلة، بعملة {currency}",
+    "chartCaption": "آخر ١٢ شهرا، حصة العائلة، بعملة {currency}",
     "recentActivity": "النشاط الأخير",
     "activityEmpty": "ستظهر التغييرات هنا."
   },
