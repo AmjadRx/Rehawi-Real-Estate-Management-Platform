@@ -123,52 +123,92 @@ export const incomeCreate = z.object({
 });
 export const incomeUpdate = incomeCreate.partial();
 
+/** Cost catalog (cost bar): everything involved in managing a property. */
+const EXPENSE_CATEGORIES = [
+  "tax",
+  "insurance",
+  "maintenance",
+  "utilities",
+  "management_fee",
+  "hoa",
+  "legal",
+  "service_charge",
+  "cleaning",
+  "security",
+  "concierge",
+  "elevator",
+  "garden",
+  "waste",
+  "internet",
+  "accounting",
+  "bank_fees",
+  "marketing",
+  "vacancy_reserve",
+  "repairs_reserve",
+  "other",
+] as const;
+
 export const expenseCreate = z
   .object({
-    category: z
-      .enum([
-        "tax",
-        "insurance",
-        "maintenance",
-        "utilities",
-        "management_fee",
-        "hoa",
-        "legal",
-        "other",
-      ])
-      .default("other"),
-    amount: moneyAmount,
+    category: z.enum(EXPENSE_CATEGORIES).default("other"),
+    amount: moneyAmount.default("0"),
     currency: currencyCode,
     spentOn: isoDate,
     // §4 v4: frequency drives the run-rate math; recurring mirrors it for
     // compatibility with older clients that still send only the flag.
     frequency: z.enum(["one_time", "monthly", "yearly"]).optional(),
     recurring: z.boolean().default(false),
+    // Percentage costs (cost bar): a share of the rent. inclusive: tenant
+    // pays rent*(1-p) and the fee is p of that collected amount; exclusive:
+    // tenant pays the full rent and the fee is p of it.
+    isPercentage: z.boolean().default(false),
+    percentValue: z.coerce.number().gt(0).lte(100).nullish(),
+    percentBase: z.enum(["inclusive", "exclusive"]).nullish(),
     notes: z.string().max(2000).nullish(),
   })
   .transform((e) => {
+    if (e.isPercentage) {
+      return {
+        ...e,
+        amount: "0",
+        percentValue:
+          e.percentValue !== null && e.percentValue !== undefined
+            ? String(e.percentValue)
+            : null,
+        percentBase: e.percentBase ?? "exclusive",
+        frequency: "monthly",
+        recurring: true,
+      };
+    }
     const frequency = e.frequency ?? (e.recurring ? "monthly" : "one_time");
-    return { ...e, frequency, recurring: frequency !== "one_time" };
-  });
+    return {
+      ...e,
+      frequency,
+      recurring: frequency !== "one_time",
+      percentValue: null,
+      percentBase: null,
+    };
+  })
+  .refine(
+    (e) => !e.isPercentage || e.percentValue !== null,
+    "Percentage costs need a percent value.",
+  );
 export const expenseUpdate = z
   .object({
-    category: z
-      .enum([
-        "tax",
-        "insurance",
-        "maintenance",
-        "utilities",
-        "management_fee",
-        "hoa",
-        "legal",
-        "other",
-      ])
-      .optional(),
+    category: z.enum(EXPENSE_CATEGORIES).optional(),
     amount: moneyAmount.optional(),
     currency: currencyCode.optional(),
     spentOn: isoDate.optional(),
     frequency: z.enum(["one_time", "monthly", "yearly"]).optional(),
     recurring: z.boolean().optional(),
+    isPercentage: z.boolean().optional(),
+    percentValue: z.coerce
+      .number()
+      .gt(0)
+      .lte(100)
+      .transform((n) => String(n))
+      .nullish(),
+    percentBase: z.enum(["inclusive", "exclusive"]).nullish(),
     notes: z.string().max(2000).nullish(),
   })
   .transform((e) =>

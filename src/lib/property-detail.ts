@@ -1,7 +1,11 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import {
+  applyPercentageCosts,
   computePropertyFinancials,
+  convert,
+  monthlyRentRunRate,
+  percentFraction,
   type PropertyFinancials,
 } from "@/lib/finance";
 import { getBaseCurrency, getRates } from "@/lib/portfolio";
@@ -126,6 +130,41 @@ export async function loadPropertyDetail(id: string) {
     baseCurrency,
   );
 
+  // Cost bar (completed properties): standing costs with their monthly
+  // equivalents in the base currency, plus the rent flow after percentage
+  // costs (inclusive shares reduce what the tenant pays).
+  const leaseInputs = leases
+    .filter((l) => l.status === "active")
+    .map((l) => ({
+      rentAmount: l.rentAmount,
+      currency: l.currency,
+      frequency: l.frequency,
+      status: l.status,
+    }));
+  const nominalRent = monthlyRentRunRate(leaseInputs, rates, baseCurrency);
+  const { tenantPays, percentageCosts } = applyPercentageCosts(
+    nominalRent,
+    expenses,
+  );
+  const costEntries = expenses
+    .filter((e) => e.isPercentage || e.frequency !== "one_time")
+    .map((e) => ({
+      id: e.id,
+      category: e.category,
+      frequency: e.frequency,
+      amount: e.amount,
+      currency: e.currency,
+      isPercentage: e.isPercentage,
+      percentValue: e.percentValue,
+      percentBase: e.percentBase,
+      monthlyCost: e.isPercentage
+        ? percentFraction(e) *
+          (e.percentBase === "inclusive" ? tenantPays : nominalRent)
+        : e.frequency === "yearly"
+          ? convert(e, rates, baseCurrency) / 12
+          : convert(e, rates, baseCurrency),
+    }));
+
   return {
     property,
     baseCurrency,
@@ -140,5 +179,12 @@ export async function loadPropertyDetail(id: string) {
     documents,
     constructionUpdates,
     maintenance,
+    costBreakdown: {
+      nominalRent,
+      tenantPays,
+      percentageCosts,
+      entries: costEntries,
+      netMonthly: financials.monthlyRunRate,
+    },
   };
 }

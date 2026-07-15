@@ -131,6 +131,96 @@ describe("computePropertyFinancials", () => {
     expect(f.opCostPct).toBeCloseTo(1_700 / 3_000);
   });
 
+  it("percentage cost INCLUSIVE: rent 100, 5% → tenant pays 95, fee 4.75", () => {
+    const f = computePropertyFinancials(
+      {
+        ...empty,
+        leases: [
+          { rentAmount: 100, currency: "EUR", frequency: "monthly", status: "active" },
+        ],
+        expenses: [
+          {
+            amount: 0,
+            currency: "EUR",
+            spentOn: "2026-06-01",
+            recurring: true,
+            frequency: "monthly",
+            isPercentage: true,
+            percentValue: 5,
+            percentBase: "inclusive",
+          },
+        ],
+      },
+      rates,
+      "EUR",
+      NOW,
+    );
+    expect(f.rentRunRate).toBeCloseTo(95); // tenant pays 95
+    expect(f.monthlyRunRate).toBeCloseTo(95 - 4.75); // management takes 4.75
+  });
+
+  it("percentage cost EXCLUSIVE: rent 100, 5% → tenant pays 100, fee 5", () => {
+    const f = computePropertyFinancials(
+      {
+        ...empty,
+        leases: [
+          { rentAmount: 100, currency: "EUR", frequency: "monthly", status: "active" },
+        ],
+        expenses: [
+          {
+            amount: 0,
+            currency: "EUR",
+            spentOn: "2026-06-01",
+            recurring: true,
+            frequency: "monthly",
+            isPercentage: true,
+            percentValue: 5,
+            percentBase: "exclusive",
+          },
+        ],
+      },
+      rates,
+      "EUR",
+      NOW,
+    );
+    expect(f.rentRunRate).toBeCloseTo(100); // tenant pays the full rent
+    expect(f.monthlyRunRate).toBeCloseTo(95); // owner pays management 5
+  });
+
+  it("percentage costs combine with fixed recurring costs", () => {
+    const f = computePropertyFinancials(
+      {
+        ...empty,
+        leases: [
+          { rentAmount: 1_000, currency: "EUR", frequency: "monthly", status: "active" },
+        ],
+        expenses: [
+          {
+            amount: 0,
+            currency: "EUR",
+            spentOn: "2026-06-01",
+            recurring: true,
+            isPercentage: true,
+            percentValue: 10,
+            percentBase: "exclusive",
+          },
+          {
+            amount: 600,
+            currency: "EUR",
+            spentOn: "2026-06-01",
+            recurring: false,
+            frequency: "yearly",
+          },
+        ],
+      },
+      rates,
+      "EUR",
+      NOW,
+    );
+    // 1000 collected, minus 100 (10% exclusive) minus 50 (600/yr)
+    expect(f.monthlyRunRate).toBeCloseTo(850);
+  });
+
   it("frequency=monthly counts in full; legacy recurring falls back to monthly", () => {
     const base = {
       ...empty,

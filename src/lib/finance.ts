@@ -28,7 +28,50 @@ export type ExpenseInput = Money & {
    * column is text). Older rows may lack it; `recurring` is the fallback.
    */
   frequency?: string;
+  /**
+   * Percentage costs (cost bar): a share of the rent instead of a fixed
+   * amount. inclusive: the tenant pays rent*(1-p) and the fee is p of that
+   * collected amount (rent 100, 5% inclusive: tenant pays 95, fee 4.75).
+   * exclusive: the tenant pays the full rent and the fee is p of it
+   * (rent 100, 5% exclusive: tenant pays 100, fee 5).
+   */
+  isPercentage?: boolean;
+  percentValue?: string | number | null;
+  percentBase?: string | null;
 };
+
+/** Fraction (0 to 1) of a percentage cost row; 0 for fixed rows. */
+export function percentFraction(e: ExpenseInput): number {
+  if (!e.isPercentage || e.percentValue === null || e.percentValue === undefined) {
+    return 0;
+  }
+  const pct = toNumber(e.percentValue);
+  return pct > 0 ? Math.min(pct, 100) / 100 : 0;
+}
+
+/**
+ * Rent flow with percentage costs applied (cost bar):
+ * - tenantPays: the nominal rent minus all INCLUSIVE percentages.
+ * - percentageCosts: inclusive fees are p of the collected (reduced) rent;
+ *   exclusive fees are p of the nominal rent.
+ */
+export function applyPercentageCosts(
+  nominalRent: number,
+  expenses: ExpenseInput[],
+): { tenantPays: number; percentageCosts: number } {
+  const inclusive = expenses.filter(
+    (e) => percentFraction(e) > 0 && e.percentBase === "inclusive",
+  );
+  const exclusive = expenses.filter(
+    (e) => percentFraction(e) > 0 && e.percentBase !== "inclusive",
+  );
+  const inclusiveSum = sum(inclusive.map(percentFraction));
+  const tenantPays = Math.max(0, nominalRent * (1 - inclusiveSum));
+  const percentageCosts =
+    sum(inclusive.map((e) => percentFraction(e) * tenantPays)) +
+    sum(exclusive.map((e) => percentFraction(e) * nominalRent));
+  return { tenantPays, percentageCosts };
+}
 
 /** currency code → rate to EUR (EUR itself must be 1). */
 export type RateTable = Record<string, number>;
@@ -159,6 +202,7 @@ export function monthlyRecurringExpenses(
 ): number {
   return sum(
     expenses.map((e) => {
+      if (e.isPercentage) return 0; // rent-relative, handled separately
       const frequency = e.frequency ?? (e.recurring ? "monthly" : "one_time");
       if (frequency === "monthly") return convert(e, rates, base);
       if (frequency === "yearly") return convert(e, rates, base) / 12;
@@ -183,9 +227,18 @@ export function computePropertyFinancials(
   const netIncome = grossIncome - operatingExpenses;
   const totalReturned = netIncome;
 
-  const rentRunRate = monthlyRentRunRate(inputs.leases, rates, base);
+  // Cost bar: percentage costs reshape the rent flow. Inclusive shares
+  // reduce what the tenant pays; the collected amount is the gross figure.
+  const nominalRent = monthlyRentRunRate(inputs.leases, rates, base);
+  const { tenantPays, percentageCosts } = applyPercentageCosts(
+    nominalRent,
+    inputs.expenses,
+  );
+  const rentRunRate = tenantPays;
   const monthlyRunRate =
-    rentRunRate - monthlyRecurringExpenses(inputs.expenses, rates, base);
+    tenantPays -
+    percentageCosts -
+    monthlyRecurringExpenses(inputs.expenses, rates, base);
   const annualRunRate = monthlyRunRate * 12;
 
   const committed = invested + outstanding;
