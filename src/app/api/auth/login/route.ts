@@ -44,6 +44,24 @@ function envPasswordMatches(expected: string | undefined, given: string) {
  * in users.password_hash, set after a one-time email verification.
  */
 export async function POST(request: NextRequest) {
+  try {
+    return await handleLogin(request);
+  } catch (error) {
+    // A thrown error here is almost always missing deployment config
+    // (SESSION_SECRET, DATABASE_URL). Say so instead of a blank 500.
+    console.error("[auth] login failed:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Sign-in is unavailable because the server is missing configuration. Check that SESSION_SECRET and DATABASE_URL are set, then redeploy.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleLogin(request: NextRequest) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
