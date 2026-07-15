@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { FadeIn } from "@/components/motion-primitives";
+import { PasswordStrength } from "@/components/password-strength";
+import { checkPasswordRules } from "@/lib/auth/password-rules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +24,8 @@ export function SettingsView({
   role,
   profile,
   isEmailUser,
+  authMode,
+  passwordSet,
 }: {
   identifier: string;
   role: string;
@@ -32,6 +36,8 @@ export function SettingsView({
     avatarDocumentId: string | null;
   };
   isEmailUser: boolean;
+  authMode: "db_password" | "otp";
+  passwordSet: boolean;
 }) {
   const t = useTranslations("settings");
   // The active locale may be a regional tag (ar-EG); the toggle stores "ar".
@@ -40,8 +46,14 @@ export function SettingsView({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState(profile);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [repeatPassword, setRepeatPassword] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const rules = checkPasswordRules(newPassword, identifier);
+  const changeReady =
+    currentPassword.length > 0 && rules.valid && newPassword === repeatPassword;
 
   async function saveProfile() {
     setBusyKey("profile");
@@ -106,17 +118,27 @@ export function SettingsView({
   async function savePassword() {
     setBusyKey("password");
     try {
-      const res = await fetch("/api/auth/set-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: newPassword }),
-      });
+      // §3.2 v4: changing a password re-checks the current one server-side.
+      const res =
+        authMode === "db_password"
+          ? await fetch("/api/v1/me/password", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ currentPassword, newPassword }),
+            })
+          : await fetch("/api/auth/set-password", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password: newPassword }),
+            });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.message ?? "Could not save the password.");
         return;
       }
+      setCurrentPassword("");
       setNewPassword("");
+      setRepeatPassword("");
       toast.success(t("passwordSaved"));
     } finally {
       setBusyKey(null);
@@ -243,30 +265,103 @@ export function SettingsView({
             <LockKeyhole className="size-4" aria-hidden />
             {t("password")}
           </h2>
-          <p className="mb-3 text-sm text-muted-foreground">{t("passwordHint")}</p>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-56 space-y-1.5">
-              <Label htmlFor="st-password">{t("newPassword")}</Label>
-              <Input
-                id="st-password"
-                type="password"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-            </div>
-            <Button
-              variant="outline"
-              className="gap-2"
-              disabled={busyKey === "password" || newPassword.length < 10}
-              onClick={savePassword}
-            >
-              {busyKey === "password" ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : null}
-              {t("savePassword")}
-            </Button>
-          </div>
+          {authMode === "db_password" && !passwordSet ? (
+            <p className="text-sm text-muted-foreground">
+              No password is set yet. Sign out and use the first-time setup on
+              the sign-in screen with the family setup code.
+            </p>
+          ) : authMode === "db_password" ? (
+            <>
+              <p className="mb-3 text-sm text-muted-foreground">
+                {t("passwordHint")}
+              </p>
+              <div className="max-w-sm space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="st-current-password">
+                    {t("currentPassword")}
+                  </Label>
+                  <Input
+                    id="st-current-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="st-password">{t("newPassword")}</Label>
+                  <Input
+                    id="st-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="st-repeat-password">
+                    {t("repeatPassword")}
+                  </Label>
+                  <Input
+                    id="st-repeat-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={repeatPassword}
+                    onChange={(e) => setRepeatPassword(e.target.value)}
+                  />
+                  {repeatPassword.length > 0 &&
+                    repeatPassword !== newPassword && (
+                      <p className="text-xs font-medium text-destructive">
+                        The passwords do not match yet.
+                      </p>
+                    )}
+                </div>
+                {newPassword.length > 0 && (
+                  <PasswordStrength password={newPassword} email={identifier} />
+                )}
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  disabled={busyKey === "password" || !changeReady}
+                  onClick={savePassword}
+                >
+                  {busyKey === "password" ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : null}
+                  {t("savePassword")}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-muted-foreground">
+                {t("passwordHint")}
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-56 space-y-1.5">
+                  <Label htmlFor="st-password">{t("newPassword")}</Label>
+                  <Input
+                    id="st-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  disabled={busyKey === "password" || newPassword.length < 10}
+                  onClick={savePassword}
+                >
+                  {busyKey === "password" ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : null}
+                  {t("savePassword")}
+                </Button>
+              </div>
+            </>
+          )}
         </FadeIn>
       )}
 

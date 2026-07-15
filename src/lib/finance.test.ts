@@ -93,17 +93,20 @@ describe("computePropertyFinancials", () => {
           { amount: 1_500, currency: "EUR", receivedOn: "2026-07-01" },
         ],
         expenses: [
+          // §4 v4: a yearly standing cost counts at one twelfth per month.
           {
             amount: 1_200,
             currency: "EUR",
             spentOn: "2026-03-15",
             recurring: true,
+            frequency: "yearly",
           },
           {
             amount: 500,
             currency: "EUR",
             spentOn: "2026-05-01",
             recurring: false,
+            frequency: "one_time",
           },
         ],
         currentValue: { amount: 240_000, currency: "EUR" },
@@ -112,7 +115,7 @@ describe("computePropertyFinancials", () => {
       "EUR",
       NOW,
     );
-    // quarterly 1500 → 500/month, minus 1200/12 = 100 recurring
+    // quarterly 1500 → 500/month, minus 1200/yr = 100/month recurring
     expect(f.monthlyRunRate).toBeCloseTo(400);
     expect(f.annualRunRate).toBeCloseTo(4_800);
     expect(f.grossIncome).toBe(3_000);
@@ -120,6 +123,51 @@ describe("computePropertyFinancials", () => {
     expect(f.netIncome).toBe(1_300);
     expect(f.capRate).toBeCloseTo(4_800 / 240_000);
     expect(f.roiToDate).toBeCloseTo(1_300 / 200_000);
+    // Gross ("excluding costs", §6.2 v4) figures stay rent-based.
+    expect(f.rentRunRate).toBeCloseTo(500);
+    expect(f.grossAnnualRunRate).toBeCloseTo(6_000);
+    expect(f.grossRoiToDate).toBeCloseTo(3_000 / 200_000);
+    expect(f.grossPaybackMonths).toBeCloseTo((200_000 - 3_000) / 500);
+    expect(f.opCostPct).toBeCloseTo(1_700 / 3_000);
+  });
+
+  it("frequency=monthly counts in full; legacy recurring falls back to monthly", () => {
+    const base = {
+      ...empty,
+      leases: [
+        {
+          rentAmount: 1_000,
+          currency: "EUR",
+          frequency: "monthly",
+          status: "active",
+        } as const,
+      ],
+    };
+    const withMonthly = computePropertyFinancials(
+      {
+        ...base,
+        expenses: [
+          { amount: 200, currency: "EUR", spentOn: "2026-06-01", recurring: false, frequency: "monthly" },
+        ],
+      },
+      rates,
+      "EUR",
+      NOW,
+    );
+    expect(withMonthly.monthlyRunRate).toBeCloseTo(800);
+
+    const legacy = computePropertyFinancials(
+      {
+        ...base,
+        expenses: [
+          { amount: 200, currency: "EUR", spentOn: "2026-06-01", recurring: true },
+        ],
+      },
+      rates,
+      "EUR",
+      NOW,
+    );
+    expect(legacy.monthlyRunRate).toBeCloseTo(800);
   });
 
   it("returns null payback when not generating income", () => {
@@ -330,6 +378,11 @@ describe("aggregateFinancials edge cases", () => {
       capRate: null,
       paybackMonths: null,
       currentValue: null,
+      rentRunRate: 0,
+      grossAnnualRunRate: 0,
+      grossRoiToDate: 0,
+      grossPaybackMonths: null,
+      opCostPct: null,
     };
     const f = aggregateFinancials([
       { ...base, ...a } as PropertyFinancials,

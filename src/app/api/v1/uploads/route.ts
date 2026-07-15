@@ -3,7 +3,6 @@ import { getDb, tables } from "@/db";
 import { apiHandler, jsonError, jsonOk } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/guard";
-import { requireCanEditProperty } from "@/lib/auth/permissions";
 import { ALLOWED_MIME, MAX_UPLOAD_BYTES, storeFile } from "@/lib/files";
 
 const CATEGORIES = new Set([
@@ -45,12 +44,10 @@ export const POST = apiHandler(async (request: NextRequest) => {
   const ownerId = form.get("ownerId") ? String(form.get("ownerId")) : null;
   const isCover = form.get("isCover") === "true";
 
-  // §7 v2: non-admins may upload to properties they created, or an
-  // unlinked photo for their own profile. Everything else is admin-only.
+  // §3.3 v4: viewers are strictly read-only. Their only allowed upload is
+  // an unlinked image for their own profile photo.
   if (user.role !== "admin") {
-    if (propertyId) {
-      await requireCanEditProperty(user, propertyId);
-    } else if (contactId || ownerId || !mime.startsWith("image/")) {
+    if (propertyId || contactId || ownerId || !mime.startsWith("image/")) {
       return jsonError(403, "This action requires an admin.");
     }
   }

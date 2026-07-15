@@ -1,16 +1,23 @@
 /**
- * AUTH_MODE (§3.2.4 v3). `env_password` is the active default and needs ZERO
- * external services: credentials live in AUTH_USERS env vars. `otp` enables
- * the code-delivery flows (Resend email, Twilio SMS) once keys exist.
+ * AUTH_MODE (§3.2.4 v4). `db_password` is the active default: allowlisted
+ * users create their own password once with the family SETUP_CODE, the
+ * argon2id hash lives in Neon, and the same email + password works on the
+ * website and the app. `otp` enables the code-delivery flows (Resend email,
+ * Twilio SMS) once keys exist. The former env_password / AUTH_USERS mode is
+ * deprecated and removed.
  *
- * Edge-safe: env + string parsing only, no node APIs (imported by middleware
- * via allowlist.ts).
+ * Edge-safe: env + string parsing only, no node APIs (imported by
+ * middleware via allowlist.ts consumers).
  */
 
-export type AuthMode = "env_password" | "otp";
+export type AuthMode = "db_password" | "otp";
 
 export function authMode(): AuthMode {
-  return process.env.AUTH_MODE === "otp" ? "otp" : "env_password";
+  return process.env.AUTH_MODE === "otp" ? "otp" : "db_password";
+}
+
+export function setupCodeConfigured(): boolean {
+  return !!process.env.SETUP_CODE;
 }
 
 export function smsConfigured(): boolean {
@@ -30,39 +37,15 @@ function devDelivery(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
-/**
- * Parse AUTH_USERS="email1:password1,email2:password2".
- * Split on the FIRST colon so passwords may contain colons; commas are the
- * only reserved character.
- */
-export function envUsers(): Map<string, string> {
-  const users = new Map<string, string>();
-  for (const entry of (process.env.AUTH_USERS ?? "").split(",")) {
-    const trimmed = entry.trim();
-    if (!trimmed) continue;
-    const colon = trimmed.indexOf(":");
-    if (colon <= 0 || colon === trimmed.length - 1) continue;
-    // Same normalization as allowlist.normalizeEmail (kept local to avoid a
-    // circular import: allowlist.ts consumes envUserEmails()).
-    users.set(
-      trimmed.slice(0, colon).trim().toLowerCase(),
-      trimmed.slice(colon + 1),
-    );
-  }
-  return users;
-}
-
-export function envUserEmails(): string[] {
-  return [...envUsers().keys()];
-}
-
 /** What the login screen may offer, given mode + configured providers. */
 export function authCapabilities() {
   const mode = authMode();
-  if (mode === "env_password") {
+  if (mode === "db_password") {
     return {
       mode,
       emailPassword: true,
+      /** First-time password creation with the family SETUP_CODE. */
+      firstTimeSetup: setupCodeConfigured(),
       emailOtp: false,
       phoneOtp: false,
     } as const;
@@ -70,6 +53,7 @@ export function authCapabilities() {
   return {
     mode,
     emailPassword: true,
+    firstTimeSetup: false,
     emailOtp: emailOtpConfigured() || devDelivery(),
     phoneOtp: smsConfigured() || devDelivery(),
   } as const;

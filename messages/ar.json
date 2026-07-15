@@ -29,7 +29,11 @@
     "expenses": "المصروفات",
     "chartCaption": "آخر ١٢ شهرا، حصة العائلة، بعملة {currency}",
     "recentActivity": "النشاط الأخير",
-    "activityEmpty": "ستظهر التغييرات هنا."
+    "activityEmpty": "ستظهر التغييرات هنا.",
+    "excludingCosts": "بدون التكاليف",
+    "includingCosts": "شاملا التكاليف",
+    "totalExpenses": "المصروفات حتى الآن: {amount}",
+    "opCostShare": "{pct} من الدخل يذهب إلى التكاليف"
   },
   "settings": {
     "title": "الإعدادات",
@@ -51,7 +55,9 @@
     "newPassword": "كلمة مرور جديدة",
     "savePassword": "حفظ كلمة المرور",
     "passwordSaved": "تم حفظ كلمة المرور.",
-    "signedInAs": "مسجل الدخول باسم {identifier} ({role})"
+    "signedInAs": "مسجل الدخول باسم {identifier} ({role})",
+    "currentPassword": "كلمة المرور الحالية",
+    "repeatPassword": "أعد إدخال كلمة المرور الجديدة"
   },
   "common": {
     "cancel": "إلغاء",

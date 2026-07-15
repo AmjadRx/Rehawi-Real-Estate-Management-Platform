@@ -30,12 +30,18 @@ export const GET = apiHandler(async (_request: NextRequest, { params }: Ctx) => 
     .limit(1);
   if (!doc) return jsonError(404, "File not found.");
 
+  // Link documents (§4 v4) have no stored file; send the visitor to the URL.
+  if (doc.kind === "link" || !doc.blobUrl) {
+    if (!doc.externalUrl) return jsonError(404, "File data missing.");
+    return Response.redirect(doc.externalUrl, 302);
+  }
+
   const stream = await readFileStream(doc.blobUrl);
   if (!stream) return jsonError(404, "File data missing.");
 
   return new Response(stream.body as BodyInit, {
     headers: {
-      "Content-Type": doc.mime,
+      "Content-Type": doc.mime ?? "application/octet-stream",
       "Content-Disposition": `inline; filename="${doc.filename.replace(/"/g, "")}"`,
       "Cache-Control": "private, max-age=3600",
     },
@@ -78,7 +84,7 @@ export const DELETE = apiHandler(
         .where(eq(tables.documents.id, documentId))
         .limit(1);
       if (!doc) return jsonError(404, "File not found.");
-      await deleteStoredFile(doc.blobUrl);
+      if (doc.blobUrl) await deleteStoredFile(doc.blobUrl);
       await db
         .delete(tables.documents)
         .where(eq(tables.documents.id, documentId));

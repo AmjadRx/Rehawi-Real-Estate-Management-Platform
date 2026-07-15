@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   const id = parseIdentifier(parsed.data.identifier);
   const wantsPhone = !!id && id.kind === "phone";
   if (
-    caps.mode === "env_password" ||
+    caps.mode === "db_password" ||
     (wantsPhone && !caps.phoneOtp) ||
     (!wantsPhone && !caps.emailOtp)
   ) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       {
         ok: false,
         message:
-          caps.mode === "env_password"
+          caps.mode === "db_password"
             ? "Code sign-in is not enabled. Use your email and password."
             : wantsPhone
               ? "Phone sign-in is not enabled yet. Use email instead."

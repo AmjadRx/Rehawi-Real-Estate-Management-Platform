@@ -23,6 +23,11 @@ export type IncomeInput = Money & { receivedOn: string | Date };
 export type ExpenseInput = Money & {
   spentOn: string | Date;
   recurring: boolean;
+  /**
+   * §4 v4: "one_time" | "monthly" | "yearly" (typed as string because the
+   * column is text). Older rows may lack it; `recurring` is the fallback.
+   */
+  frequency?: string;
 };
 
 /** currency code → rate to EUR (EUR itself must be 1). */
@@ -63,6 +68,16 @@ export interface PropertyFinancials {
    */
   paybackMonths: number | null;
   currentValue: number | null;
+  /**
+   * Gross ("excluding costs", §6.2 v4) figures: rent-based run-rates and
+   * the payback/ROI they imply, before operating expenses.
+   */
+  rentRunRate: number;
+  grossAnnualRunRate: number;
+  grossRoiToDate: number;
+  grossPaybackMonths: number | null;
+  /** operating expenses ÷ gross income; null when there is no income yet. */
+  opCostPct: number | null;
 }
 
 const MONTHS_PER_PERIOD: Record<LeaseInput["frequency"], number> = {
@@ -131,26 +146,33 @@ export function monthlyRentRunRate(
   );
 }
 
-/** Average monthly recurring expenses over the trailing 12 months. */
+/**
+ * Standing monthly cost (§4 v4): each expense entry declares its frequency.
+ * monthly counts in full, yearly counts at one twelfth, one_time entries
+ * affect totals but not the run-rate. Older rows without a frequency fall
+ * back to the legacy `recurring` flag (treated as monthly).
+ */
 export function monthlyRecurringExpenses(
   expenses: ExpenseInput[],
   rates: RateTable,
   base = "EUR",
-  now: Date = new Date(),
 ): number {
-  const cutoff = new Date(now);
-  cutoff.setMonth(cutoff.getMonth() - 12);
-  const recent = expenses.filter(
-    (e) => e.recurring && new Date(e.spentOn) >= cutoff,
+  return sum(
+    expenses.map((e) => {
+      const frequency = e.frequency ?? (e.recurring ? "monthly" : "one_time");
+      if (frequency === "monthly") return convert(e, rates, base);
+      if (frequency === "yearly") return convert(e, rates, base) / 12;
+      return 0;
+    }),
   );
-  return sum(recent.map((e) => convert(e, rates, base))) / 12;
 }
 
 export function computePropertyFinancials(
   inputs: PropertyFinancialInputs,
   rates: RateTable,
   base = "EUR",
-  now: Date = new Date(),
+  // Kept for signature compatibility; run-rates no longer depend on dates.
+  _now: Date = new Date(),
 ): PropertyFinancials {
   const invested = totalInvested(inputs.payments, rates, base);
   const outstanding = outstandingCommitment(inputs.installments, rates, base);
@@ -161,9 +183,9 @@ export function computePropertyFinancials(
   const netIncome = grossIncome - operatingExpenses;
   const totalReturned = netIncome;
 
+  const rentRunRate = monthlyRentRunRate(inputs.leases, rates, base);
   const monthlyRunRate =
-    monthlyRentRunRate(inputs.leases, rates, base) -
-    monthlyRecurringExpenses(inputs.expenses, rates, base, now);
+    rentRunRate - monthlyRecurringExpenses(inputs.expenses, rates, base);
   const annualRunRate = monthlyRunRate * 12;
 
   const committed = invested + outstanding;
@@ -195,6 +217,14 @@ export function computePropertyFinancials(
     capRate,
     paybackMonths,
     currentValue,
+    rentRunRate,
+    grossAnnualRunRate: rentRunRate * 12,
+    grossRoiToDate: invested > 0 ? grossIncome / invested : 0,
+    grossPaybackMonths:
+      rentRunRate > 0
+        ? Math.max(0, (invested - grossIncome) / rentRunRate)
+        : null,
+    opCostPct: grossIncome > 0 ? operatingExpenses / grossIncome : null,
   };
 }
 
@@ -206,13 +236,15 @@ export function scaleByShare(
   const s = sharePct / 100;
   const invested = f.invested * s;
   const outstanding = f.outstanding * s;
+  const grossIncome = f.grossIncome * s;
   const totalReturned = f.totalReturned * s;
   const monthlyRunRate = f.monthlyRunRate * s;
+  const rentRunRate = f.rentRunRate * s;
   return {
     ...f,
     invested,
     outstanding,
-    grossIncome: f.grossIncome * s,
+    grossIncome,
     operatingExpenses: f.operatingExpenses * s,
     netIncome: f.netIncome * s,
     totalReturned,
@@ -226,6 +258,14 @@ export function scaleByShare(
       monthlyRunRate > 0
         ? Math.max(0, (invested - totalReturned) / monthlyRunRate)
         : null,
+    rentRunRate,
+    grossAnnualRunRate: rentRunRate * 12,
+    grossRoiToDate: f.grossRoiToDate, // ratio: share-invariant
+    grossPaybackMonths:
+      rentRunRate > 0
+        ? Math.max(0, (invested - grossIncome) / rentRunRate)
+        : null,
+    opCostPct: f.opCostPct, // ratio: share-invariant
   };
 }
 
@@ -245,6 +285,7 @@ export function aggregateFinancials(
     .filter((v): v is number => v !== null);
   const currentValue = values.length ? sum(values) : null;
   const annualRunRate = monthlyRunRate * 12;
+  const rentRunRate = sum(items.map((i) => i.rentRunRate));
   const committed = invested + outstanding;
   return {
     invested,
@@ -264,6 +305,14 @@ export function aggregateFinancials(
         ? Math.max(0, (invested - totalReturned) / monthlyRunRate)
         : null,
     currentValue,
+    rentRunRate,
+    grossAnnualRunRate: rentRunRate * 12,
+    grossRoiToDate: invested > 0 ? grossIncome / invested : 0,
+    grossPaybackMonths:
+      rentRunRate > 0
+        ? Math.max(0, (invested - grossIncome) / rentRunRate)
+        : null,
+    opCostPct: grossIncome > 0 ? operatingExpenses / grossIncome : null,
   };
 }
 

@@ -72,7 +72,7 @@ export function OwnerProfile({
     id: string;
     filename: string;
     category: string;
-    mime: string;
+    mime: string | null;
     uploadedAt: string;
   }>;
   isAdmin: boolean;

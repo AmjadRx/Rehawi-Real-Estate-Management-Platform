@@ -43,7 +43,6 @@ export function PropertyDetailView({
         allContacts={allContacts}
         tab={tab}
         onTabChange={setTab}
-        onRequestEdit={() => setEditOpen(true)}
       />
     </div>
   );

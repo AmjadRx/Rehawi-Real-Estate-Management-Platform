@@ -14,7 +14,7 @@ const ARGON2_OPTIONS = {
   parallelism: 1,
 };
 
-export const MIN_PASSWORD_LENGTH = 10;
+export { MIN_PASSWORD_LENGTH } from "./password-rules";
 
 export async function hashPassword(password: string): Promise<string> {
   return hash(password, ARGON2_OPTIONS);
@@ -74,9 +74,22 @@ export async function recordFailure(identifier: string): Promise<void> {
     });
 }
 
+/**
+ * Record a successful login (§7 v4): the row is kept with the counter reset
+ * to zero, so login_attempts documents successes as well as failures.
+ */
 export async function clearFailures(identifier: string): Promise<void> {
   const db = await getDb();
   await db
-    .delete(tables.loginAttempts)
-    .where(eq(tables.loginAttempts.identifier, identifier));
+    .insert(tables.loginAttempts)
+    .values({
+      identifier,
+      failedCount: 0,
+      lockedUntil: null,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: tables.loginAttempts.identifier,
+      set: { failedCount: 0, lockedUntil: null, updatedAt: new Date() },
+    });
 }

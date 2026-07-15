@@ -28,7 +28,7 @@ export default async function AdminPage() {
   if (!user || user.role !== "admin") redirect("/");
 
   const db = await getDb();
-  const [rates, audit, reminders, baseCurrency] = await Promise.all([
+  const [rates, audit, reminders, baseCurrency, userRows] = await Promise.all([
     db
       .select()
       .from(tables.exchangeRates)
@@ -43,6 +43,7 @@ export default async function AdminPage() {
       .from(tables.reminders)
       .orderBy(asc(tables.reminders.dueDate)),
     getBaseCurrency(),
+    db.select().from(tables.users).orderBy(asc(tables.users.email)),
   ]);
 
   return (
@@ -73,6 +74,15 @@ export default async function AdminPage() {
         dueDate: r.dueDate,
         message: r.message,
         resolved: r.resolved,
+      }))}
+      users={userRows.map((u) => ({
+        id: u.id,
+        email: u.email,
+        phone: u.phone,
+        name: u.name,
+        role: u.role,
+        passwordSet: !!u.passwordHash,
+        lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
       }))}
     />
   );

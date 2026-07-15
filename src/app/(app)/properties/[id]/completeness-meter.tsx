@@ -1,26 +1,15 @@
 "use client";
 
-import { CircleCheck, Plus } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { computeCompleteness } from "@/lib/completeness";
 import type { PropertyDetail } from "@/lib/property-detail";
 
 /**
- * Profile completeness meter (§6.3 v3): % complete plus the exact missing
- * fields, each with a quick-add button jumping straight to that field's
- * editor (the edit dialog or the relevant tab).
+ * Profile completeness meter (§6.3 v4): % complete plus a plain read-only
+ * list of the missing fields.
  */
-export function CompletenessMeter({
-  detail,
-  canEdit,
-  onRequestEdit,
-  onOpenTab,
-}: {
-  detail: PropertyDetail;
-  canEdit: boolean;
-  onRequestEdit: () => void;
-  onOpenTab: (tab: string) => void;
-}) {
+export function CompletenessMeter({ detail }: { detail: PropertyDetail }) {
   const { pct, done, total, missing } = computeCompleteness(detail);
 
   if (missing.length === 0) {
@@ -47,28 +36,14 @@ export function CompletenessMeter({
         {done} of {total} fields provided. Missing:
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {missing.map((m) =>
-          canEdit ? (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() =>
-                m.target.kind === "edit" ? onRequestEdit() : onOpenTab(m.target.tab)
-              }
-              className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:border-primary/50 hover:text-primary"
-            >
-              <Plus className="size-3" aria-hidden />
-              {m.label}
-            </button>
-          ) : (
-            <span
-              key={m.key}
-              className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground"
-            >
-              {m.label}
-            </span>
-          ),
-        )}
+        {missing.map((m) => (
+          <span
+            key={m.key}
+            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground"
+          >
+            {m.label}
+          </span>
+        ))}
       </div>
     </section>
   );
