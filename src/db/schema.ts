@@ -279,6 +279,9 @@ export const expenses = pgTable("expenses", {
   currency: char("currency", { length: 3 }).notNull(),
   spentOn: date("spent_on").notNull(),
   recurring: boolean("recurring").notNull().default(false),
+  // v4: one_time | monthly | yearly. `recurring` is kept for compatibility
+  // and mirrors frequency !== 'one_time'.
+  frequency: text("frequency").notNull().default("one_time"),
   notes: text("notes"),
 });
 
@@ -302,10 +305,14 @@ export const documents = pgTable("documents", {
   contactId: uuid("contact_id").references(() => contacts.id),
   ownerId: uuid("owner_id").references(() => owners.id),
   category: documentCategory("category").notNull().default("other"),
-  blobUrl: text("blob_url").notNull(),
+  // v4: kind=file stores a Blob upload; kind=link stores a pasted URL that
+  // renders as a hyperlink. Blob columns are null for links.
+  kind: text("kind").notNull().default("file"),
+  externalUrl: text("external_url"),
+  blobUrl: text("blob_url"),
   filename: text("filename").notNull(),
-  mime: text("mime").notNull(),
-  sizeBytes: integer("size_bytes").notNull(),
+  mime: text("mime"),
+  sizeBytes: integer("size_bytes"),
   width: integer("width"),
   height: integer("height"),
   isCover: boolean("is_cover").notNull().default(false),

@@ -4,8 +4,6 @@
  * Runs in both node and edge runtimes — env only, no I/O.
  */
 
-import { envUserEmails } from "./mode";
-
 export type Role = "admin" | "viewer";
 
 export type Identifier =
@@ -52,11 +50,7 @@ export function isAllowlisted(id: Identifier): boolean {
     id.kind === "email"
       ? parseList(process.env.ADMIN_EMAILS, "email")
       : parseList(process.env.ADMIN_PHONES, "phone");
-  if (list.includes(id.value) || admins.includes(id.value)) return true;
-  // AUTH_MODE=env_password (§3.2.4 v3): emails in AUTH_USERS are implicitly
-  // allowlisted, so the middleware's per-request revalidation accepts their
-  // sessions without duplicating them in ALLOWED_EMAILS.
-  return id.kind === "email" && envUserEmails().includes(id.value);
+  return list.includes(id.value) || admins.includes(id.value);
 }
 
 export function roleFor(id: Identifier): Role {

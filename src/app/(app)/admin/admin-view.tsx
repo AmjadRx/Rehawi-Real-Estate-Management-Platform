@@ -82,12 +82,23 @@ function Section({
   );
 }
 
+interface AdminUser {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  name: string | null;
+  role: string;
+  passwordSet: boolean;
+  lastLoginAt: string | null;
+}
+
 export function AdminView({
   baseCurrency,
   allowlist,
   rates,
   audit,
   reminders,
+  users,
 }: {
   baseCurrency: string;
   allowlist: {
@@ -99,6 +110,7 @@ export function AdminView({
   rates: Rate[];
   audit: AuditRow[];
   reminders: Reminder[];
+  users: AdminUser[];
 }) {
   const router = useRouter();
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -175,6 +187,57 @@ export function AdminView({
                   )}
                 </div>
               </div>
+            </div>
+            <div className="mt-4 border-t pt-3">
+              <p className="mb-1.5 text-sm font-medium">Accounts & passwords</p>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Forgotten password (§3.2 v4): clear the hash, then the member
+                repeats first-time setup with the family setup code.
+              </p>
+              <ul className="space-y-1.5">
+                {users.length === 0 && (
+                  <li className="text-sm text-muted-foreground">
+                    No accounts yet. They appear after first sign-in or setup.
+                  </li>
+                )}
+                {users.map((u) => (
+                  <li
+                    key={u.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">
+                        {u.email ?? u.phone ?? u.name ?? u.id.slice(0, 8)}
+                      </span>
+                      <Badge variant={u.role === "admin" ? "default" : "secondary"}>
+                        {u.role}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {u.passwordSet ? "password set" : "no password"}
+                      </span>
+                    </span>
+                    {u.passwordSet && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busyKey === `clearpw-${u.id}`}
+                        onClick={() =>
+                          run(
+                            `clearpw-${u.id}`,
+                            () =>
+                              fetch(`/api/v1/users/${u.id}/clear-password`, {
+                                method: "POST",
+                              }),
+                            "Password cleared. They can redo setup with the family code.",
+                          )
+                        }
+                      >
+                        Clear password
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           </Section>
         </FadeIn>

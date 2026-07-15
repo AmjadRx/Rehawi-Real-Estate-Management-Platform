@@ -8,6 +8,7 @@ import {
   History,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Bar,
@@ -32,6 +33,7 @@ import {
   formatDate,
   formatMoney,
   formatMonthYear,
+  formatPercent,
 } from "@/lib/format";
 import type { MonthlyFlow } from "@/lib/portfolio";
 import { cn } from "@/lib/utils";
@@ -73,9 +75,20 @@ export function DashboardView({
   const locale = useLocale();
   const money = (n: number) => formatMoney(n, baseCurrency, { compact: true });
 
+  // Gross/True toggle (§6.2 v4): "Excluding costs" shows rent-based
+  // figures; "Including costs" shows the same metrics after operating
+  // expenses, plus expense context.
+  const [includeCosts, setIncludeCosts] = useState(true);
+  const returned = includeCosts ? totals.totalReturned : totals.grossIncome;
+  const monthly = includeCosts ? totals.monthlyRunRate : totals.rentRunRate;
+  const yearly = includeCosts ? totals.annualRunRate : totals.grossAnnualRunRate;
+  const paybackMonths = includeCosts
+    ? totals.paybackMonths
+    : totals.grossPaybackMonths;
+
   // Uncapped payback (§6.2 v2): "X years, Y months" plus a projected
   // "Month YYYY" date, localized for EN and AR.
-  const parts = paybackParts(totals.paybackMonths);
+  const parts = paybackParts(paybackMonths);
   const paybackLabel =
     parts.kind === "none"
       ? tc("notYetGenerating")
@@ -86,7 +99,7 @@ export function DashboardView({
           : parts.months === 0
             ? tc("paybackYears", { years: parts.years })
             : tc("paybackBoth", { years: parts.years, months: parts.months });
-  const projected = paybackDate(totals.paybackMonths);
+  const projected = paybackDate(paybackMonths);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-8">
@@ -102,6 +115,35 @@ export function DashboardView({
         </p>
       </FadeIn>
 
+      {/* Gross/True toggle (§6.2 v4) */}
+      <FadeIn delay={0.05}>
+        <div
+          className="inline-flex rounded-full border bg-card p-1 shadow-sm"
+          role="group"
+          aria-label={`${t("excludingCosts")} / ${t("includingCosts")}`}
+        >
+          {([
+            [false, t("excludingCosts")],
+            [true, t("includingCosts")],
+          ] as const).map(([value, label]) => (
+            <button
+              key={String(value)}
+              type="button"
+              aria-pressed={includeCosts === value}
+              onClick={() => setIncludeCosts(value)}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                includeCosts === value
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </FadeIn>
+
       {/* Headline figures (§6.2) */}
       <Stagger className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StaggerItem>
@@ -115,8 +157,15 @@ export function DashboardView({
         <StaggerItem>
           <StatCard
             label={t("totalReturned")}
-            value={totals.totalReturned}
+            value={returned}
             format={money}
+            caption={
+              includeCosts
+                ? t("totalExpenses", {
+                    amount: formatMoney(totals.operatingExpenses, baseCurrency),
+                  })
+                : undefined
+            }
           />
         </StaggerItem>
         <StaggerItem>
@@ -129,14 +178,19 @@ export function DashboardView({
         <StaggerItem>
           <StatCard
             label={t("monthlyIncome")}
-            value={totals.monthlyRunRate}
+            value={monthly}
             format={(n) => formatMoney(n, baseCurrency)}
+            caption={
+              includeCosts && totals.opCostPct !== null
+                ? t("opCostShare", { pct: formatPercent(totals.opCostPct) })
+                : undefined
+            }
           />
         </StaggerItem>
         <StaggerItem>
           <StatCard
             label={t("yearlyIncome")}
-            value={totals.annualRunRate}
+            value={yearly}
             format={(n) => formatMoney(n, baseCurrency)}
           />
         </StaggerItem>

@@ -1,10 +1,8 @@
-import { createHash, timingSafeEqual } from "crypto";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, tables } from "@/db";
 import { isAllowlisted, parseIdentifier, roleFor } from "@/lib/auth/allowlist";
-import { authMode, envUsers } from "@/lib/auth/mode";
 import {
   checkLock,
   clearFailures,
@@ -29,19 +27,11 @@ const invalid = () =>
   );
 
 /**
- * Constant-time comparison (§3.2.4 v3): hash both sides so length never
- * leaks, then timingSafeEqual on equal-length digests.
- */
-function envPasswordMatches(expected: string | undefined, given: string) {
-  const a = createHash("sha256").update(given).digest();
-  const b = createHash("sha256").update(expected ?? "").digest();
-  return timingSafeEqual(a, b) && expected !== undefined;
-}
-
-/**
- * §3.2 email path. AUTH_MODE=env_password (v3 default): passwords come from
- * AUTH_USERS env vars, zero external services. AUTH_MODE=otp: argon2id hash
- * in users.password_hash, set after a one-time email verification.
+ * §3.2 v4 email path (AUTH_MODE=db_password, the active default): verify
+ * against the argon2id hash in users.password_hash. The hash is created by
+ * the user during first-time setup with the family SETUP_CODE, so the same
+ * credentials work on the website and the app. Success AND failure are both
+ * recorded in login_attempts (lock 15 min after 5 failures).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -92,29 +82,22 @@ async function handleLogin(request: NextRequest) {
     .where(eq(tables.users.email, id.value))
     .limit(1);
 
-  if (authMode() === "env_password") {
-    if (!envPasswordMatches(envUsers().get(id.value), parsed.data.password)) {
-      await recordFailure(id.value);
-      return invalid();
-    }
-  } else {
-    // First-time allowlisted email: route the client into the one-time
-    // verification + set-password flow instead of a dead-end failure.
-    if (!user?.passwordHash) {
-      return NextResponse.json(
-        {
-          ok: false,
-          needsSetup: true,
-          message: "Set up your password first. We will email you a code.",
-        },
-        { status: 409 },
-      );
-    }
-    const valid = await verifyPassword(user.passwordHash, parsed.data.password);
-    if (!valid) {
-      await recordFailure(id.value);
-      return invalid();
-    }
+  // First-time allowlisted email: route the client into the one-time
+  // setup flow (SETUP_CODE in db_password mode, emailed code in otp mode).
+  if (!user?.passwordHash) {
+    return NextResponse.json(
+      {
+        ok: false,
+        needsSetup: true,
+        message: "Set up your password first.",
+      },
+      { status: 409 },
+    );
+  }
+  const valid = await verifyPassword(user.passwordHash, parsed.data.password);
+  if (!valid) {
+    await recordFailure(id.value);
+    return invalid();
   }
 
   await clearFailures(id.value);

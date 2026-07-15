@@ -34,7 +34,9 @@ export default async function SettingsPage() {
         phone: row?.phone ?? "",
         avatarDocumentId: row?.avatarDocumentId ?? null,
       }}
-      isEmailUser={user.identifier.includes("@") && authMode() === "otp"}
+      isEmailUser={user.identifier.includes("@")}
+      authMode={authMode()}
+      passwordSet={!!row?.passwordHash}
     />
   );
 }

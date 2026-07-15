@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   "/api/auth/request-otp",
   "/api/auth/verify-otp",
   "/api/auth/login",
+  "/api/auth/setup",
   "/api/auth/config",
   "/api/auth/logout",
   "/api/health",
@@ -27,17 +28,16 @@ const PUBLIC_PATHS = [
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
- * §7 v2 self-service: viewers may edit their own profile, create
- * properties, and mutate data they created. Ownership is enforced by the
- * routes themselves; the middleware only opens these path prefixes.
+ * §3.3 v4: ALLOWED_EMAILS users are strictly VIEW-ONLY. Their only
+ * permitted mutations are auth flows, their own profile, their own
+ * password, and the avatar upload that own-profile editing needs (the
+ * uploads route rejects property-attached uploads for non-admins).
  */
 function viewerMayMutate(method: string, pathname: string): boolean {
   if (pathname === "/api/v1/me" && method === "PATCH") return true;
+  if (pathname === "/api/v1/me/password" && method === "POST") return true;
   if (pathname === "/api/auth/set-password" && method === "POST") return true;
-  if (pathname.startsWith("/api/v1/properties")) return true;
   if (pathname === "/api/v1/uploads" && method === "POST") return true;
-  if (pathname === "/api/v1/extract" && method === "POST") return true;
-  if (pathname.startsWith("/api/v1/files/")) return true;
   return false;
 }
 
@@ -47,11 +47,53 @@ function isPublic(pathname: string): boolean {
   );
 }
 
+/**
+ * CORS (§7 v4, required for the mobile app): origins listed in
+ * CORS_ORIGINS get credentialed CORS on all /api routes. Never a wildcard
+ * together with credentials. Native app requests have no Origin header and
+ * pass through regardless.
+ */
+function corsOriginFor(request: NextRequest): string | null {
+  const origin = request.headers.get("origin");
+  if (!origin) return null;
+  const allowed = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  return allowed.includes(origin.replace(/\/$/, "")) ? origin : null;
+}
+
+function applyCors(response: NextResponse, origin: string | null): NextResponse {
+  if (!origin) return response;
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set("Access-Control-Allow-Credentials", "true");
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Authorization, Content-Type",
+  );
+  response.headers.append("Vary", "Origin");
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith("/api");
+  const corsOrigin = isApi ? corsOriginFor(request) : null;
 
-  if (isPublic(pathname)) return NextResponse.next();
+  // Preflight requests carry no credentials and must answer before auth.
+  if (isApi && request.method === "OPTIONS") {
+    const preflight = new NextResponse(null, { status: 204 });
+    preflight.headers.set("Access-Control-Max-Age", "86400");
+    return applyCors(preflight, corsOrigin);
+  }
+
+  if (isPublic(pathname)) {
+    return applyCors(NextResponse.next(), corsOrigin);
+  }
 
   // Vercel Cron (§7/§13.9): cron endpoints may authenticate with the
   // CRON_SECRET bearer token instead of a session. The routes re-check it.
@@ -62,7 +104,7 @@ export async function middleware(request: NextRequest) {
     process.env.CRON_SECRET &&
     bearer === `Bearer ${process.env.CRON_SECRET}`
   ) {
-    return NextResponse.next();
+    return applyCors(NextResponse.next(), corsOrigin);
   }
   const token =
     request.cookies.get(SESSION_COOKIE)?.value ??
@@ -77,9 +119,12 @@ export async function middleware(request: NextRequest) {
 
   if (!authorized) {
     if (isApi) {
-      return NextResponse.json(
-        { ok: false, message: "Authentication required." },
-        { status: 401 },
+      return applyCors(
+        NextResponse.json(
+          { ok: false, message: "Authentication required." },
+          { status: 401 },
+        ),
+        corsOrigin,
       );
     }
     const login = request.nextUrl.clone();
@@ -88,18 +133,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  // Viewer role (§3.3, v2 self-service): mutations are admin-only except
-  // own-profile edits, property creation, and writes to data they created
-  // (ownership checks live in the routes).
+  // Roles (§3.3 v4): viewers are strictly read-only; the few own-account
+  // exceptions live in viewerMayMutate.
   if (
     session.role !== "admin" &&
     isApi &&
     MUTATING_METHODS.has(request.method) &&
     !viewerMayMutate(request.method, pathname)
   ) {
-    return NextResponse.json(
-      { ok: false, message: "This action requires an admin." },
-      { status: 403 },
+    return applyCors(
+      NextResponse.json(
+        { ok: false, message: "This action requires an admin." },
+        { status: 403 },
+      ),
+      corsOrigin,
     );
   }
 
@@ -126,7 +173,7 @@ export async function middleware(request: NextRequest) {
     response.cookies.set(SESSION_COOKIE, fresh, sessionCookieOptions());
   }
 
-  return response;
+  return applyCors(response, corsOrigin);
 }
 
 export const config = {

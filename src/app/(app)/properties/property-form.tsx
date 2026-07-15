@@ -102,7 +102,7 @@ interface InstallmentRow {
 interface ExpenseRow {
   category: string;
   amount: string;
-  recurring: boolean;
+  frequency: string;
 }
 interface LeaseDraft {
   tenantName: string;
@@ -240,6 +240,64 @@ export function PropertyFormDialog({
       </Select>
     </div>
   );
+
+  // §7 v4 geo proxy: live address suggestions; picking one fills the
+  // location fields with verified parts and server-resolved coordinates.
+  const [geoQuery, setGeoQuery] = useState("");
+  const [geoResults, setGeoResults] = useState<
+    Array<{ placeId: string; description: string }>
+  >([]);
+  const [geoBusy, setGeoBusy] = useState(false);
+  const geoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function searchGeo(q: string) {
+    setGeoQuery(q);
+    if (geoTimer.current) clearTimeout(geoTimer.current);
+    if (q.trim().length < 3) {
+      setGeoResults([]);
+      return;
+    }
+    geoTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/v1/geo/search?q=${encodeURIComponent(q.trim())}`,
+        );
+        const data = await res.json().catch(() => ({}));
+        setGeoResults(res.ok ? (data.suggestions ?? []) : []);
+      } catch {
+        setGeoResults([]);
+      }
+    }, 300);
+  }
+
+  async function pickPlace(placeId: string, description: string) {
+    setGeoBusy(true);
+    try {
+      const res = await fetch(
+        `/api/v1/geo/details?placeId=${encodeURIComponent(placeId)}`,
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.message ?? "Could not load that address.");
+        return;
+      }
+      const p = data.place;
+      setValues((v) => ({
+        ...v,
+        country: p.country ?? v.country,
+        city: p.city ?? v.city,
+        addressLine: p.addressLine ?? v.addressLine,
+        postalCode: p.postalCode ?? v.postalCode,
+        lat: p.lat !== null && p.lat !== undefined ? String(p.lat) : v.lat,
+        lng: p.lng !== null && p.lng !== undefined ? String(p.lng) : v.lng,
+      }));
+      setGeoResults([]);
+      setGeoQuery(description);
+      toast.success("Address verified and filled in.");
+    } finally {
+      setGeoBusy(false);
+    }
+  }
 
   /**
    * §6.3 v2 "Autofill from documents": send screenshots/photos/PDFs to
@@ -406,7 +464,7 @@ export function PropertyFormDialog({
                 amount: e.amount,
                 currency,
                 spentOn: today,
-                recurring: e.recurring,
+                frequency: e.frequency,
               },
             ]),
         ];
@@ -581,6 +639,39 @@ export function PropertyFormDialog({
             <h3 className="text-sm font-semibold text-muted-foreground">
               Location
             </h3>
+            <div className="space-y-1.5">
+              <Label htmlFor="pf-geo">Search address</Label>
+              <div className="relative">
+                <Input
+                  id="pf-geo"
+                  value={geoQuery}
+                  onChange={(e) => searchGeo(e.target.value)}
+                  placeholder="Type an address or place name"
+                  enterKeyHint="search"
+                  autoComplete="off"
+                />
+                {geoResults.length > 0 && (
+                  <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border bg-popover shadow-md">
+                    {geoResults.slice(0, 6).map((r) => (
+                      <li key={r.placeId}>
+                        <button
+                          type="button"
+                          disabled={geoBusy}
+                          className="w-full px-3 py-2 text-start text-sm transition-colors hover:bg-muted disabled:opacity-50"
+                          onClick={() => pickPlace(r.placeId, r.description)}
+                        >
+                          {r.description}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pick a suggestion to fill the fields below with a verified
+                address and map pin. You can still edit everything manually.
+              </p>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {field("country", "Country *", { placeholder: "Germany" })}
               {field("city", "City *", { placeholder: "Berlin" })}
@@ -999,7 +1090,7 @@ export function PropertyFormDialog({
 
               <OptionalSection
                 title="Recurring expenses"
-                hint="Taxes, insurance, fees"
+                hint="Monthly or yearly costs"
               >
                 {expenses.map((row, i) => (
                   <div
@@ -1041,17 +1132,26 @@ export function PropertyFormDialog({
                         }
                       />
                     </div>
-                    <label className="flex items-center gap-2 pb-2 text-sm">
-                      <Switch
-                        checked={row.recurring}
-                        onCheckedChange={(checked) =>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Frequency</Label>
+                      <Select
+                        value={row.frequency}
+                        onValueChange={(v) =>
                           setExpenses((s) =>
-                            s.map((r, j) => (j === i ? { ...r, recurring: checked } : r)),
+                            s.map((r, j) => (j === i ? { ...r, frequency: v } : r)),
                           )
                         }
-                      />
-                      Monthly
-                    </label>
+                      >
+                        <SelectTrigger className="w-28" aria-label="Expense frequency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="one_time">One time</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="yearly">Yearly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
@@ -1071,7 +1171,7 @@ export function PropertyFormDialog({
                   onClick={() =>
                     setExpenses((s) => [
                       ...s,
-                      { category: "maintenance", amount: "", recurring: true },
+                      { category: "maintenance", amount: "", frequency: "monthly" },
                     ])
                   }
                 >

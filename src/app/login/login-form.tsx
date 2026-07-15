@@ -22,21 +22,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PasswordStrength } from "@/components/password-strength";
+import { checkPasswordRules } from "@/lib/auth/password-rules";
 import { COUNTRIES } from "@/lib/countries";
 
 type Phase =
   | "credentials" // email+password or phone entry
-  | "code" // 5-digit boxes (phone flow, or email first-time verification)
-  | "create-password"; // one-time setup after email verification
+  | "code" // 5-digit boxes (otp mode: phone flow or email verification)
+  | "create-password" // otp mode: one-time setup after email verification
+  | "setup"; // db_password mode: SETUP_CODE + create password (§3.2 v4)
 
 const spring = { type: "spring", bounce: 0, visualDuration: 0.35 } as const;
 
 export function LoginForm({
   mode,
+  firstTimeSetup,
   emailOtp,
   phoneOtp,
 }: {
-  mode: "env_password" | "otp";
+  mode: "db_password" | "otp";
+  firstTimeSetup: boolean;
   emailOtp: boolean;
   phoneOtp: boolean;
 }) {
@@ -48,6 +53,8 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [repeatPassword, setRepeatPassword] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const [dial, setDial] = useState("+971:AE");
   const [phone, setPhone] = useState("");
   const [digits, setDigits] = useState<string[]>(["", "", "", "", ""]);
@@ -111,6 +118,11 @@ export function LoginForm({
       }
       if (data.needsSetup) {
         setBusy(false);
+        if (mode === "db_password") {
+          setError(null);
+          setPhase("setup");
+          return;
+        }
         setNotice("First sign-in: we are emailing you a verification code.");
         await requestCode();
         return;
@@ -121,7 +133,7 @@ export function LoginForm({
     } finally {
       setBusy(false);
     }
-  }, [busy, email, password, enterApp, requestCode]);
+  }, [busy, email, password, mode, enterApp, requestCode]);
 
   const verify = useCallback(
     async (code: string) => {
@@ -180,6 +192,41 @@ export function LoginForm({
       setBusy(false);
     }
   }, [busy, newPassword, enterApp]);
+
+  // §3.2 v4 first-time setup: allowlisted email + family SETUP_CODE
+  // creates the user's own password.
+  const setupCheck = checkPasswordRules(newPassword, email);
+  const setupReady =
+    setupCode.trim().length > 0 &&
+    setupCheck.valid &&
+    newPassword === repeatPassword;
+
+  const submitSetup = useCallback(async () => {
+    if (busy || !setupReady) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          setupCode: setupCode.trim(),
+          password: newPassword,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.message ?? "Setup failed. Check the code and try again.");
+        return;
+      }
+      enterApp();
+    } catch {
+      setError("Network error. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, setupReady, email, setupCode, newPassword, enterApp]);
 
   const setDigit = (index: number, value: string) => {
     const cleaned = value.replace(/\D/g, "");
@@ -304,11 +351,25 @@ export function LoginForm({
                   First time here, or forgot your password? Get a code.
                 </button>
               ) : (
-                mode === "env_password" && (
-                  <p className="text-center text-xs text-muted-foreground">
-                    Forgot your password? Ask the family admin to reset it.
-                  </p>
-                )
+                <div className="space-y-1 text-center text-xs text-muted-foreground">
+                  {firstTimeSetup && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (email.trim()) {
+                          setError(null);
+                          setPhase("setup");
+                        } else {
+                          setError("Enter your email first, then start setup.");
+                        }
+                      }}
+                      className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+                    >
+                      First time here? Set up your password with the family code.
+                    </button>
+                  )}
+                  <p>Forgot your password? Ask the family admin to reset it.</p>
+                </div>
               )}
             </motion.form>
           )}
@@ -448,6 +509,93 @@ export function LoginForm({
                 </button>
               </div>
             </motion.div>
+          )}
+
+          {phase === "setup" && (
+            <motion.form
+              key="setup"
+              initial={{ opacity: 0, transform: "translateX(16px)" }}
+              animate={{ opacity: 1, transform: "translateX(0px)" }}
+              exit={{ opacity: 0 }}
+              transition={spring}
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitSetup();
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1 text-center">
+                <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <LockKeyhole className="size-5" aria-hidden />
+                </div>
+                <p className="text-sm font-medium">First-time setup</p>
+                <p className="text-xs text-muted-foreground">
+                  Enter the family setup code for {email || "your email"}, then
+                  create your own password. It will work on the website and
+                  the app.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="setup-code">Family setup code</Label>
+                <Input
+                  id="setup-code"
+                  autoComplete="one-time-code"
+                  value={setupCode}
+                  onChange={(e) => setSetupCode(e.target.value)}
+                  autoFocus
+                  className="h-11 text-base"
+                  enterKeyHint="next"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="setup-password">New password</Label>
+                <Input
+                  id="setup-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="h-11 text-base"
+                  enterKeyHint="next"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="setup-repeat">Repeat new password</Label>
+                <Input
+                  id="setup-repeat"
+                  type="password"
+                  autoComplete="new-password"
+                  value={repeatPassword}
+                  onChange={(e) => setRepeatPassword(e.target.value)}
+                  className="h-11 text-base"
+                  enterKeyHint="done"
+                />
+                {repeatPassword.length > 0 && repeatPassword !== newPassword && (
+                  <p className="text-xs font-medium text-destructive">
+                    The passwords do not match yet.
+                  </p>
+                )}
+              </div>
+              <PasswordStrength password={newPassword} email={email} />
+              <Button
+                type="submit"
+                className="h-11 w-full text-base"
+                disabled={busy || !setupReady}
+              >
+                {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                Create password and sign in
+              </Button>
+              <button
+                type="button"
+                className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+                onClick={() => {
+                  setPhase("credentials");
+                  setError(null);
+                }}
+              >
+                Go back
+              </button>
+            </motion.form>
           )}
 
           {phase === "create-password" && (

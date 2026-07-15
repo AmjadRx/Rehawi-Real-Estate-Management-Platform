@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
+import { useState } from "react";
 import { StatCard } from "@/components/stat-card";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -161,7 +163,6 @@ export function PropertyTabs({
   allContacts,
   tab,
   onTabChange,
-  onRequestEdit,
 }: {
   detail: PropertyDetail;
   canEdit: boolean;
@@ -171,10 +172,8 @@ export function PropertyTabs({
     role: string;
     companyName: string | null;
   }>;
-  /** Lifted so the completeness meter (§6.3 v3) can jump to any editor. */
   tab: string;
   onTabChange: (tab: string) => void;
-  onRequestEdit: () => void;
 }) {
   const { property, financials, baseCurrency } = detail;
   const showConstruction = property.status !== "completed";
@@ -196,6 +195,12 @@ export function PropertyTabs({
   ];
 
   const currency = property.currency;
+
+  // Gross/True toggle (§6.2/§6.4 v4) for this property's own figures.
+  const [includeCosts, setIncludeCosts] = useState(true);
+  const finPayback = includeCosts
+    ? financials.paybackMonths
+    : financials.grossPaybackMonths;
 
   return (
     <Tabs value={tab} onValueChange={onTabChange}>
@@ -220,12 +225,7 @@ export function PropertyTabs({
         >
           {tab === "overview" && (
             <>
-              <CompletenessMeter
-                detail={detail}
-                canEdit={canEdit}
-                onRequestEdit={onRequestEdit}
-                onOpenTab={onTabChange}
-              />
+              <CompletenessMeter detail={detail} />
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatCard
                   label="Invested"
@@ -354,6 +354,31 @@ export function PropertyTabs({
 
           {tab === "financials" && (
             <>
+              <div
+                className="inline-flex rounded-full border bg-card p-1 shadow-sm"
+                role="group"
+                aria-label="Excluding costs / Including costs"
+              >
+                {([
+                  [false, "Excluding costs"],
+                  [true, "Including costs"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    aria-pressed={includeCosts === value}
+                    onClick={() => setIncludeCosts(value)}
+                    className={cn(
+                      "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                      includeCosts === value
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatCard
                   label="Total invested"
@@ -361,21 +386,31 @@ export function PropertyTabs({
                   format={(n) => formatMoney(n, baseCurrency, { compact: true })}
                 />
                 <StatCard
-                  label="Net income (NOI)"
-                  value={financials.netIncome}
+                  label={includeCosts ? "Net income (NOI)" : "Gross income"}
+                  value={includeCosts ? financials.netIncome : financials.grossIncome}
                   format={(n) => formatMoney(n, baseCurrency)}
+                  caption={
+                    includeCosts
+                      ? `Expenses to date: ${formatMoney(financials.operatingExpenses, baseCurrency)}`
+                      : financials.opCostPct !== null
+                        ? `${formatPercent(financials.opCostPct)} of income goes to costs`
+                        : undefined
+                  }
                 />
                 <StatCard
-                  label="ROI to date"
-                  value={formatPercent(financials.roiToDate, 2)}
+                  label={includeCosts ? "True ROI to date" : "Gross ROI to date"}
+                  value={formatPercent(
+                    includeCosts ? financials.roiToDate : financials.grossRoiToDate,
+                    2,
+                  )}
                 />
                 <StatCard
                   label="Payback estimate"
-                  value={formatPayback(financials.paybackMonths)}
+                  value={formatPayback(finPayback)}
                   caption={
                     [
-                      paybackDate(financials.paybackMonths)
-                        ? `Projected: ${formatMonthYear(paybackDate(financials.paybackMonths))}`
+                      paybackDate(finPayback)
+                        ? `Projected: ${formatMonthYear(paybackDate(finPayback))}`
                         : null,
                       financials.capRate !== null
                         ? `Cap rate ${formatPercent(financials.capRate, 1)}`
@@ -460,6 +495,17 @@ export function PropertyTabs({
                             defaultValue: "maintenance",
                             options: Object.entries(EXPENSE_CATEGORY_LABEL),
                           },
+                          {
+                            key: "frequency",
+                            label: "Frequency",
+                            kind: "select",
+                            defaultValue: "one_time",
+                            options: [
+                              ["one_time", "One time"],
+                              ["monthly", "Monthly"],
+                              ["yearly", "Yearly"],
+                            ],
+                          },
                         ]}
                       />
                     )
@@ -482,10 +528,23 @@ export function PropertyTabs({
                             <TableCell>{formatDate(row.spentOn)}</TableCell>
                             <TableCell>
                               {EXPENSE_CATEGORY_LABEL[row.category]}
-                              {row.recurring ? " · recurring" : ""}
+                              {row.frequency === "monthly"
+                                ? " · monthly"
+                                : row.frequency === "yearly"
+                                  ? " · yearly"
+                                  : ""}
                             </TableCell>
                             <TableCell className="text-right font-medium tabular-numbers">
                               {formatMoney(row.amount, row.currency)}
+                              {row.frequency === "yearly" && (
+                                <span className="block text-xs font-normal text-muted-foreground">
+                                  {formatMoney(
+                                    parseFloat(row.amount) / 12,
+                                    row.currency,
+                                  )}{" "}
+                                  monthly
+                                </span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

@@ -40,11 +40,8 @@ export default async function PropertyPage({
     .from(tables.contacts)
     .orderBy(asc(tables.contacts.name));
 
-  // §7 v2 self-service: admins edit everything; other users edit the
-  // properties they created (the API enforces the same rule).
-  const canEdit =
-    user?.role === "admin" ||
-    (!!user && detail.property.createdBy === user.id);
+  // §3.3 v4: viewers are strictly read-only; editing is admin-only.
+  const canEdit = user?.role === "admin";
 
   return (
     <PropertyDetailView

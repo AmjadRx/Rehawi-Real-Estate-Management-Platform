@@ -2,12 +2,16 @@
 
 import {
   Download,
+  ExternalLink,
   FileText,
   Image as ImageIcon,
+  Link2,
   Loader2,
   Trash2,
   UploadCloud,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -61,6 +65,39 @@ export function DocumentsPanel({
     id: string;
     filename: string;
   } | null>(null);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkName, setLinkName] = useState("");
+
+  // §4 v4: link-type documents, a pasted URL rendered as a hyperlink.
+  async function addLink() {
+    if (!linkUrl.trim() || !linkName.trim()) return;
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/v1/properties/${detail.property.id}/documents`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category,
+            filename: linkName.trim(),
+            externalUrl: linkUrl.trim(),
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message ?? "Could not save the link.");
+        return;
+      }
+      toast.success("Link added.");
+      setLinkUrl("");
+      setLinkName("");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function upload(files: FileList | File[]) {
     if (!files.length) return;
@@ -182,6 +219,47 @@ export function DocumentsPanel({
             accept="image/*,.pdf,.docx,.xlsx"
             onChange={(e) => e.target.files && upload(e.target.files)}
           />
+          <div className="mt-4 border-t pt-4">
+            <p className="mb-2 flex items-center justify-center gap-1.5 text-sm font-medium">
+              <Link2 className="size-4" aria-hidden />
+              Or add a link instead
+            </p>
+            <div className="mx-auto flex max-w-xl flex-wrap items-end justify-center gap-2">
+              <div className="min-w-40 flex-1 space-y-1 text-start">
+                <Label htmlFor="doc-link-url" className="text-xs">
+                  URL
+                </Label>
+                <Input
+                  id="doc-link-url"
+                  type="url"
+                  placeholder="https://"
+                  enterKeyHint="next"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                />
+              </div>
+              <div className="min-w-36 flex-1 space-y-1 text-start">
+                <Label htmlFor="doc-link-name" className="text-xs">
+                  Display name
+                </Label>
+                <Input
+                  id="doc-link-name"
+                  placeholder="Sales contract on Drive"
+                  enterKeyHint="done"
+                  value={linkName}
+                  onChange={(e) => setLinkName(e.target.value)}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || !linkUrl.trim() || !linkName.trim()}
+                onClick={addLink}
+              >
+                Add link
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -203,7 +281,11 @@ export function DocumentsPanel({
             </h3>
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {docs.map((doc) => {
-                const isImage = doc.mime.startsWith("image/");
+                const isLink = doc.kind === "link";
+                const isImage = !!doc.mime?.startsWith("image/");
+                const openHref = isLink
+                  ? (doc.externalUrl ?? "#")
+                  : `/api/v1/files/${doc.id}`;
                 return (
                   <li
                     key={doc.id}
@@ -228,16 +310,23 @@ export function DocumentsPanel({
                       </button>
                     ) : (
                       <a
-                        href={`/api/v1/files/${doc.id}`}
+                        href={openHref}
                         target="_blank"
                         rel="noreferrer"
                         className="flex h-32 items-center justify-center bg-muted"
                         aria-label={`Open ${doc.filename}`}
                       >
-                        <FileText
-                          className="size-10 text-muted-foreground"
-                          aria-hidden
-                        />
+                        {isLink ? (
+                          <Link2
+                            className="size-10 text-muted-foreground"
+                            aria-hidden
+                          />
+                        ) : (
+                          <FileText
+                            className="size-10 text-muted-foreground"
+                            aria-hidden
+                          />
+                        )}
                       </a>
                     )}
                     <div className="flex items-center justify-between gap-2 p-2.5">
@@ -247,7 +336,9 @@ export function DocumentsPanel({
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatDate(doc.uploadedAt)} ·{" "}
-                          {(doc.sizeBytes / 1024 / 1024).toFixed(1)} MB
+                          {isLink
+                            ? "Link"
+                            : `${((doc.sizeBytes ?? 0) / 1024 / 1024).toFixed(1)} MB`}
                           {doc.isCover && (
                             <Badge variant="secondary" className="ml-1.5">
                               Cover
@@ -257,13 +348,24 @@ export function DocumentsPanel({
                       </div>
                       <div className="flex shrink-0">
                         <Button asChild variant="ghost" size="icon">
-                          <a
-                            href={`/api/v1/files/${doc.id}`}
-                            download={doc.filename}
-                            aria-label={`Download ${doc.filename}`}
-                          >
-                            <Download className="size-4" aria-hidden />
-                          </a>
+                          {isLink ? (
+                            <a
+                              href={openHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Open ${doc.filename}`}
+                            >
+                              <ExternalLink className="size-4" aria-hidden />
+                            </a>
+                          ) : (
+                            <a
+                              href={`/api/v1/files/${doc.id}`}
+                              download={doc.filename}
+                              aria-label={`Download ${doc.filename}`}
+                            >
+                              <Download className="size-4" aria-hidden />
+                            </a>
+                          )}
                         </Button>
                         {canEdit && (
                           <Button

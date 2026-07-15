@@ -123,26 +123,59 @@ export const incomeCreate = z.object({
 });
 export const incomeUpdate = incomeCreate.partial();
 
-export const expenseCreate = z.object({
-  category: z
-    .enum([
-      "tax",
-      "insurance",
-      "maintenance",
-      "utilities",
-      "management_fee",
-      "hoa",
-      "legal",
-      "other",
-    ])
-    .default("other"),
-  amount: moneyAmount,
-  currency: currencyCode,
-  spentOn: isoDate,
-  recurring: z.boolean().default(false),
-  notes: z.string().max(2000).nullish(),
-});
-export const expenseUpdate = expenseCreate.partial();
+export const expenseCreate = z
+  .object({
+    category: z
+      .enum([
+        "tax",
+        "insurance",
+        "maintenance",
+        "utilities",
+        "management_fee",
+        "hoa",
+        "legal",
+        "other",
+      ])
+      .default("other"),
+    amount: moneyAmount,
+    currency: currencyCode,
+    spentOn: isoDate,
+    // §4 v4: frequency drives the run-rate math; recurring mirrors it for
+    // compatibility with older clients that still send only the flag.
+    frequency: z.enum(["one_time", "monthly", "yearly"]).optional(),
+    recurring: z.boolean().default(false),
+    notes: z.string().max(2000).nullish(),
+  })
+  .transform((e) => {
+    const frequency = e.frequency ?? (e.recurring ? "monthly" : "one_time");
+    return { ...e, frequency, recurring: frequency !== "one_time" };
+  });
+export const expenseUpdate = z
+  .object({
+    category: z
+      .enum([
+        "tax",
+        "insurance",
+        "maintenance",
+        "utilities",
+        "management_fee",
+        "hoa",
+        "legal",
+        "other",
+      ])
+      .optional(),
+    amount: moneyAmount.optional(),
+    currency: currencyCode.optional(),
+    spentOn: isoDate.optional(),
+    frequency: z.enum(["one_time", "monthly", "yearly"]).optional(),
+    recurring: z.boolean().optional(),
+    notes: z.string().max(2000).nullish(),
+  })
+  .transform((e) =>
+    e.frequency === undefined
+      ? e
+      : { ...e, recurring: e.frequency !== "one_time" },
+  );
 
 export const contactCreate = z.object({
   name: z.string().min(1).max(200),
@@ -178,6 +211,27 @@ export const contactUpdate = contactCreate.partial();
 export const propertyContactLink = z.object({
   contactId: z.uuid(),
   relationshipNote: z.string().max(300).nullish(),
+});
+
+/** §4 v4: link-type documents store a pasted URL + display name. */
+export const linkDocumentCreate = z.object({
+  category: z
+    .enum([
+      "contract",
+      "title_deed",
+      "receipt",
+      "insurance",
+      "warranty",
+      "inspection",
+      "floor_plan",
+      "permit",
+      "photo",
+      "id_document",
+      "other",
+    ])
+    .default("other"),
+  filename: z.string().min(1).max(200),
+  externalUrl: z.url().max(2000),
 });
 
 export const constructionUpdateCreate = z.object({

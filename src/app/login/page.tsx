@@ -14,6 +14,7 @@ export default function LoginPage() {
       <Suspense>
         <LoginForm
           mode={caps.mode}
+          firstTimeSetup={caps.firstTimeSetup}
           emailOtp={caps.emailOtp}
           phoneOtp={caps.phoneOtp}
         />

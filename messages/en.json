@@ -29,7 +29,11 @@
     "expenses": "Expenses",
     "chartCaption": "Last 12 months, family share, in {currency}",
     "recentActivity": "Recent activity",
-    "activityEmpty": "Changes will appear here."
+    "activityEmpty": "Changes will appear here.",
+    "excludingCosts": "Excluding costs",
+    "includingCosts": "Including costs",
+    "totalExpenses": "Expenses to date: {amount}",
+    "opCostShare": "{pct} of income goes to costs"
   },
   "settings": {
     "title": "Settings",
@@ -51,7 +55,9 @@
     "newPassword": "New password",
     "savePassword": "Save password",
     "passwordSaved": "Password saved.",
-    "signedInAs": "Signed in as {identifier} ({role})"
+    "signedInAs": "Signed in as {identifier} ({role})",
+    "currentPassword": "Current password",
+    "repeatPassword": "Repeat new password"
   },
   "common": {
     "cancel": "Cancel",
