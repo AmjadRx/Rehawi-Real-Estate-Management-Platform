@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   "/api/auth/request-otp",
   "/api/auth/verify-otp",
   "/api/auth/login",
+  "/api/auth/config",
   "/api/auth/logout",
   "/api/health",
   "/manifest.webmanifest",

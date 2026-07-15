@@ -2,7 +2,6 @@
 
 import { ArrowLeft, Building2, ExternalLink, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { FadeIn } from "@/components/motion-primitives";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,13 +19,17 @@ export function PropertyHeader({
   detail,
   canEdit,
   owners,
+  editOpen,
+  onEditOpenChange,
 }: {
   detail: PropertyDetail;
   canEdit: boolean;
   owners: Array<{ id: string; name: string }>;
+  /** Lifted so the completeness meter can jump straight to the editor. */
+  editOpen: boolean;
+  onEditOpenChange: (open: boolean) => void;
 }) {
   const { property } = detail;
-  const [editOpen, setEditOpen] = useState(false);
 
   const mapsUrl =
     property.lat && property.lng
@@ -54,7 +57,10 @@ export function PropertyHeader({
     lng: property.lng ?? "",
     sizeSqm: property.sizeSqm ?? "",
     yearBuilt: property.yearBuilt ? String(property.yearBuilt) : "",
+    floors: property.floors !== null ? String(property.floors) : "",
+    units: property.units !== null ? String(property.units) : "",
     description: property.description ?? "",
+    notes: property.notes ?? "",
   };
 
   return (
@@ -120,7 +126,7 @@ export function PropertyHeader({
                 size="sm"
                 variant="outline"
                 className="gap-1.5"
-                onClick={() => setEditOpen(true)}
+                onClick={() => onEditOpenChange(true)}
               >
                 <Pencil className="size-3.5" aria-hidden />
                 Edit
@@ -133,7 +139,7 @@ export function PropertyHeader({
       {canEdit && (
         <PropertyFormDialog
           open={editOpen}
-          onOpenChange={setEditOpen}
+          onOpenChange={onEditOpenChange}
           owners={owners}
           initial={initial}
           initialOwners={detail.owners.map((o) => ({

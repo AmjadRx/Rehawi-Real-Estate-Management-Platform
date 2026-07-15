@@ -1,5 +1,25 @@
 /** Display formatting helpers — readability first: clear units, no noise. */
 
+/**
+ * Active UI locale, set once per render pass by <Providers> (client) so every
+ * formatter below follows the user's language without threading a locale
+ * argument through dozens of call sites. In Arabic, ALL numerals render as
+ * Eastern Arabic-Indic digits via the ar-EG formatting locale (§2 v3),
+ * including amounts, percentages, chart labels, and dates with Arabic month
+ * names.
+ */
+let activeLocale = "en";
+
+export function setFormatLocale(locale: string) {
+  activeLocale = locale;
+}
+
+/** BCP-47 tag used for all Intl formatting. */
+function tag(explicit?: string): string {
+  const locale = explicit ?? activeLocale;
+  return locale.startsWith("ar") ? "ar-EG" : "en-GB";
+}
+
 export function formatMoney(
   amount: number | string,
   currency = "EUR",
@@ -9,7 +29,7 @@ export function formatMoney(
   if (!Number.isFinite(n)) return "-";
   const { compact = false, decimals } = options;
   const useCompact = compact && Math.abs(n) >= 100_000;
-  return new Intl.NumberFormat("en-GB", {
+  return new Intl.NumberFormat(tag(), {
     style: "currency",
     currency,
     notation: useCompact ? "compact" : "standard",
@@ -21,13 +41,18 @@ export function formatMoney(
 }
 
 export function formatNumber(n: number, decimals = 0): string {
-  return new Intl.NumberFormat("en-GB", {
+  return new Intl.NumberFormat(tag(), {
     maximumFractionDigits: decimals,
   }).format(n);
 }
 
+/** Compact axis/tick labels (charts): 1.2K, 3M — Arabic digits in AR. */
+export function formatCompactNumber(n: number): string {
+  return new Intl.NumberFormat(tag(), { notation: "compact" }).format(n);
+}
+
 export function formatPercent(ratio: number, decimals = 0): string {
-  return new Intl.NumberFormat("en-GB", {
+  return new Intl.NumberFormat(tag(), {
     style: "percent",
     maximumFractionDigits: decimals,
   }).format(ratio);
@@ -36,7 +61,7 @@ export function formatPercent(ratio: number, decimals = 0): string {
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(tag(), {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -46,10 +71,10 @@ export function formatDate(date: string | Date | null | undefined): string {
 /** "March 2058" style projected dates (§6.2 v2), locale-aware for AR. */
 export function formatMonthYear(
   date: Date | null | undefined,
-  locale = "en",
+  locale?: string,
 ): string {
   if (!date) return "-";
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en-GB", {
+  return new Intl.DateTimeFormat(tag(locale), {
     month: "long",
     year: "numeric",
   }).format(date);

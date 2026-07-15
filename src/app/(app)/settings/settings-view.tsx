@@ -34,7 +34,8 @@ export function SettingsView({
   isEmailUser: boolean;
 }) {
   const t = useTranslations("settings");
-  const locale = useLocale();
+  // The active locale may be a regional tag (ar-EG); the toggle stores "ar".
+  const language = useLocale().startsWith("ar") ? "ar" : "en";
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -225,7 +226,7 @@ export function SettingsView({
           {t("language")}
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">{t("languageHint")}</p>
-        <Select value={locale} onValueChange={setLanguage}>
+        <Select value={language} onValueChange={setLanguage}>
           <SelectTrigger className="w-56" aria-label={t("language")}>
             <SelectValue />
           </SelectTrigger>

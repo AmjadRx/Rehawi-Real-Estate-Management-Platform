@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/auth/guard";
 import { loadPropertyDetail } from "@/lib/property-detail";
-import { PropertyHeader } from "./property-header";
-import { PropertyTabs } from "./property-tabs";
+import { PropertyDetailView } from "./property-detail-view";
 import { getDb, tables } from "@/db";
 import { asc } from "drizzle-orm";
 
@@ -48,22 +47,16 @@ export default async function PropertyPage({
     (!!user && detail.property.createdBy === user.id);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-      <PropertyHeader
-        detail={detail}
-        canEdit={canEdit}
-        owners={allOwners.map((o) => ({ id: o.id, name: o.name }))}
-      />
-      <PropertyTabs
-        detail={detail}
-        canEdit={canEdit}
-        allContacts={allContacts.map((c) => ({
-          id: c.id,
-          name: c.name,
-          role: c.role,
-          companyName: c.companyName,
-        }))}
-      />
-    </div>
+    <PropertyDetailView
+      detail={detail}
+      canEdit={canEdit}
+      owners={allOwners.map((o) => ({ id: o.id, name: o.name }))}
+      allContacts={allContacts.map((c) => ({
+        id: c.id,
+        name: c.name,
+        role: c.role,
+        companyName: c.companyName,
+      }))}
+    />
   );
 }

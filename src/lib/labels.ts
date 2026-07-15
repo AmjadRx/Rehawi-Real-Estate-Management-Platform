@@ -6,13 +6,14 @@ export const STATUS_LABEL: Record<string, string> = {
   completed: "Completed",
 };
 
+// §16: these badges overlay photos, so backgrounds are fully OPAQUE in both
+// themes (no alpha) with high-contrast text.
 export const STATUS_BADGE: Record<string, string> = {
-  planned:
-    "bg-pink-100 text-pink-900 dark:bg-pink-500/20 dark:text-pink-200",
+  planned: "bg-pink-100 text-pink-950 dark:bg-pink-900 dark:text-pink-50",
   under_construction:
-    "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200",
+    "bg-amber-100 text-amber-950 dark:bg-amber-800 dark:text-amber-50",
   completed:
-    "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200",
+    "bg-emerald-100 text-emerald-950 dark:bg-emerald-900 dark:text-emerald-50",
 };
 
 export const TYPE_LABEL: Record<string, string> = {

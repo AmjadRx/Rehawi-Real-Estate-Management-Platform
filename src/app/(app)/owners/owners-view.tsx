@@ -49,6 +49,7 @@ import {
 import { formatPayback, paybackDate } from "@/lib/finance";
 import {
   countryFlag,
+  formatCompactNumber,
   formatMoney,
   formatMonthYear,
   formatPercent,
@@ -389,7 +390,7 @@ export function OwnersView({
                   axisLine={false}
                   tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
                   tickFormatter={(v: number) =>
-                    Intl.NumberFormat("en-GB", { notation: "compact" }).format(v)
+                    formatCompactNumber(v)
                   }
                 />
                 <YAxis
@@ -477,7 +478,7 @@ export function OwnersView({
                 width={52}
                 tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
                 tickFormatter={(v: number) =>
-                  Intl.NumberFormat("en-GB", { notation: "compact" }).format(v)
+                  formatCompactNumber(v)
                 }
               />
               <Tooltip

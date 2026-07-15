@@ -27,7 +27,12 @@ import {
   paybackParts,
   type PropertyFinancials,
 } from "@/lib/finance";
-import { formatDate, formatMoney, formatMonthYear } from "@/lib/format";
+import {
+  formatCompactNumber,
+  formatDate,
+  formatMoney,
+  formatMonthYear,
+} from "@/lib/format";
 import type { MonthlyFlow } from "@/lib/portfolio";
 import { cn } from "@/lib/utils";
 
@@ -231,9 +236,7 @@ export function DashboardView({
                   axisLine={false}
                   width={44}
                   tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-                  tickFormatter={(v: number) =>
-                    Intl.NumberFormat("en-GB", { notation: "compact" }).format(v)
-                  }
+                  tickFormatter={formatCompactNumber}
                 />
                 <Tooltip
                   cursor={{ fill: "var(--muted)", opacity: 0.5 }}

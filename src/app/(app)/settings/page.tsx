@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 import { getDb, tables } from "@/db";
 import { currentUser } from "@/lib/auth/guard";
+import { authMode } from "@/lib/auth/mode";
 import { SettingsView } from "./settings-view";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export default async function SettingsPage() {
         phone: row?.phone ?? "",
         avatarDocumentId: row?.avatarDocumentId ?? null,
       }}
-      isEmailUser={user.identifier.includes("@")}
+      isEmailUser={user.identifier.includes("@") && authMode() === "otp"}
     />
   );
 }
