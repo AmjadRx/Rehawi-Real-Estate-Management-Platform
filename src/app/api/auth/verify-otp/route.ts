@@ -16,6 +16,24 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  try {
+    return await handleVerify(request);
+  } catch (error) {
+    // A thrown error here is almost always missing deployment config
+    // (SESSION_SECRET, OTP_PEPPER, DATABASE_URL). Say so instead of a blank 500.
+    console.error("[auth] verify-otp failed:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Sign-in is unavailable because the server is missing configuration. Check that SESSION_SECRET, OTP_PEPPER and DATABASE_URL are set, then redeploy.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleVerify(request: NextRequest) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
