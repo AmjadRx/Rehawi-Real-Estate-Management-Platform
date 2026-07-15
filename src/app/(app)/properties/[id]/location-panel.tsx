@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2, MapPin, Save } from "lucide-react";
+import { ExternalLink, Loader2, MapPin, Save } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -9,12 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PropertyDetail } from "@/lib/property-detail";
 
+// MapLibre needs the browser; render client-side only.
+const OsmMap = dynamic(
+  () => import("@/components/osm-map").then((m) => m.OsmMap),
+  { ssr: false },
+);
+
 /**
- * Location tab (§6.4): full-width map, coordinates, address fields.
- * Uses the keyless Google Maps embed for display; admins adjust the pin by
- * editing coordinates (manual pin-drop fallback per §1 — the JS-API
- * draggable marker activates automatically once
- * NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is configured on a deployment).
+ * Location tab (§6.4): full-width MapLibre map on OpenStreetMap tiles
+ * (free, no key). Admins drag the pin or edit coordinates; "Open in
+ * Google Maps" stays a plain link.
  */
 export function LocationPanel({
   detail,
@@ -30,22 +35,25 @@ export function LocationPanel({
   const [busy, setBusy] = useState(false);
 
   const hasCoords = !!property.lat && !!property.lng;
-  const query = hasCoords
-    ? `${property.lat},${property.lng}`
-    : [property.addressLine, property.city, property.country]
-        .filter(Boolean)
-        .join(", ");
-  const embedSrc = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=${hasCoords ? 15 : 11}&output=embed`;
+  const mapsUrl = hasCoords
+    ? `https://www.google.com/maps/search/?api=1&query=${property.lat},${property.lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        [property.addressLine, property.city, property.country]
+          .filter(Boolean)
+          .join(", "),
+      )}`;
 
-  async function saveCoords() {
+  async function saveCoords(next?: { lat: number; lng: number }) {
+    const latValue = next ? String(next.lat) : lat;
+    const lngValue = next ? String(next.lng) : lng;
     setBusy(true);
     try {
       const res = await fetch(`/api/v1/properties/${property.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lat: lat ? Number(lat) : null,
-          lng: lng ? Number(lng) : null,
+          lat: latValue ? Number(latValue) : null,
+          lng: lngValue ? Number(lngValue) : null,
         }),
       });
       if (!res.ok) {
@@ -53,7 +61,11 @@ export function LocationPanel({
         toast.error(data.message ?? "Could not save coordinates.");
         return;
       }
-      toast.success("Coordinates updated.");
+      if (next) {
+        setLat(String(next.lat));
+        setLng(String(next.lng));
+      }
+      toast.success("Pin location updated.");
       router.refresh();
     } finally {
       setBusy(false);
@@ -63,13 +75,45 @@ export function LocationPanel({
   return (
     <div className="space-y-4">
       <div className="overflow-hidden rounded-2xl border shadow-sm">
-        <iframe
-          title={`Map of ${property.name}`}
-          src={embedSrc}
-          className="h-[380px] w-full md:h-[460px]"
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
+        {hasCoords ? (
+          <OsmMap
+            lat={parseFloat(property.lat!)}
+            lng={parseFloat(property.lng!)}
+            zoom={15}
+            draggable={canEdit}
+            onMove={(pos) =>
+              saveCoords({
+                lat: Math.round(pos.lat * 1e6) / 1e6,
+                lng: Math.round(pos.lng * 1e6) / 1e6,
+              })
+            }
+            className="h-[380px] w-full md:h-[460px]"
+          />
+        ) : (
+          <div className="flex h-[240px] flex-col items-center justify-center gap-2 bg-muted/40 text-center">
+            <MapPin className="size-8 text-muted-foreground/60" aria-hidden />
+            <p className="text-sm font-medium">No map pin yet</p>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              {canEdit
+                ? "Use the address search in the edit dialog, or enter coordinates below."
+                : "Coordinates have not been provided for this property."}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {canEdit && hasCoords && (
+          <p className="text-xs text-muted-foreground">
+            Drag the pin to correct the location; it saves automatically.
+          </p>
+        )}
+        <Button asChild variant="outline" size="sm" className="ml-auto gap-1.5">
+          <a href={mapsUrl} target="_blank" rel="noreferrer">
+            <ExternalLink className="size-3.5" aria-hidden />
+            Open in Google Maps
+          </a>
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -96,14 +140,6 @@ export function LocationPanel({
               <dt className="text-muted-foreground">Country</dt>
               <dd className="text-right font-medium">{property.country}</dd>
             </div>
-            {property.googlePlaceId && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Place ID</dt>
-                <dd className="truncate text-right font-mono text-xs">
-                  {property.googlePlaceId}
-                </dd>
-              </div>
-            )}
           </dl>
         </section>
 
@@ -136,7 +172,11 @@ export function LocationPanel({
                   />
                 </div>
               </div>
-              <Button onClick={saveCoords} disabled={busy} className="gap-2">
+              <Button
+                onClick={() => saveCoords()}
+                disabled={busy}
+                className="gap-2"
+              >
                 {busy ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (
@@ -145,8 +185,8 @@ export function LocationPanel({
                 Save pin location
               </Button>
               <p className="text-xs text-muted-foreground">
-                Right-click any spot in Google Maps → click the coordinates to
-                copy them, then paste here.
+                Tip: the address search in the edit dialog fills these
+                automatically. You can also drag the pin on the map above.
               </p>
             </div>
           ) : (

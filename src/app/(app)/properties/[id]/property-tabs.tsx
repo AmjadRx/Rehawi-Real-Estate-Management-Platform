@@ -42,6 +42,7 @@ import {
 } from "@/lib/labels";
 import type { PropertyDetail } from "@/lib/property-detail";
 import { CompletenessMeter } from "./completeness-meter";
+import { CostsPanel } from "./costs-panel";
 import { DocumentsPanel } from "./documents-panel";
 import { LocationPanel } from "./location-panel";
 import { AddRecordButton, type FieldDef } from "./record-forms";
@@ -421,6 +422,12 @@ export function PropertyTabs({
                   }
                 />
               </div>
+
+              {/* Cost bar: only completed properties carry running costs;
+                  planned and under-construction ones have none to manage. */}
+              {property.status === "completed" && (
+                <CostsPanel detail={detail} canEdit={canEdit} />
+              )}
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <Section

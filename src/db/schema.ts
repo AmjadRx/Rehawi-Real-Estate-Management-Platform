@@ -63,6 +63,21 @@ export const expenseCategory = pgEnum("expense_category", [
   "management_fee",
   "hoa",
   "legal",
+  // Cost catalog (cost bar): everything commonly involved in managing a
+  // property. Enum values are only ever ADDED, never removed (§10).
+  "service_charge",
+  "cleaning",
+  "security",
+  "concierge",
+  "elevator",
+  "garden",
+  "waste",
+  "internet",
+  "accounting",
+  "bank_fees",
+  "marketing",
+  "vacancy_reserve",
+  "repairs_reserve",
   "other",
 ]);
 export const contactRole = pgEnum("contact_role", [
@@ -282,6 +297,13 @@ export const expenses = pgTable("expenses", {
   // v4: one_time | monthly | yearly. `recurring` is kept for compatibility
   // and mirrors frequency !== 'one_time'.
   frequency: text("frequency").notNull().default("one_time"),
+  // Percentage costs (cost bar): a share of the rent instead of a fixed
+  // amount. inclusive: the tenant pays rent*(1-p) and the fee is p of that
+  // collected amount. exclusive: the tenant pays full rent and the fee is
+  // p of it. `amount` stays "0" for percentage rows.
+  isPercentage: boolean("is_percentage").notNull().default(false),
+  percentValue: numeric("percent_value"),
+  percentBase: text("percent_base"),
   notes: text("notes"),
 });
 
