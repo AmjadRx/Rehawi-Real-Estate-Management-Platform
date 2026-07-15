@@ -11,7 +11,8 @@
     "directory": "Directory",
     "admin": "Admin",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "toggleTheme": "Switch between light and dark mode"
   },
   "dashboard": {
     "title": "Family portfolio",

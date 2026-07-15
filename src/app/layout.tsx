@@ -52,10 +52,11 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Dark mode before first paint — follows the OS setting. */}
+        {/* Dark mode before first paint. A stored choice (theme toggle)
+            wins; otherwise the OS setting applies and is followed live. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var m=window.matchMedia("(prefers-color-scheme: dark)");var apply=function(){document.documentElement.classList.toggle("dark",m.matches)};apply();m.addEventListener("change",apply)}catch(e){}})();`,
+            __html: `(function(){try{var m=window.matchMedia("(prefers-color-scheme: dark)");var apply=function(){var t=null;try{t=localStorage.getItem("theme")}catch(e){}document.documentElement.classList.toggle("dark",t?t==="dark":m.matches)};apply();m.addEventListener("change",apply);window.addEventListener("storage",apply)}catch(e){}})();`,
           }}
         />
       </head>

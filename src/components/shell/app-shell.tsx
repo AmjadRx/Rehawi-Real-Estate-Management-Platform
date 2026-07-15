@@ -15,6 +15,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Tooltip,
   TooltipContent,
@@ -107,19 +108,22 @@ export function AppShell({
               <p className="truncate text-sm font-medium">{identifier}</p>
               <p className="text-xs capitalize text-muted-foreground">{role}</p>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={logout}
-                  aria-label={t("signOut")}
-                >
-                  <LogOut className="size-4" aria-hidden />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("signOut")}</TooltipContent>
-            </Tooltip>
+            <div className="flex shrink-0 items-center">
+              <ThemeToggle />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={logout}
+                    aria-label={t("signOut")}
+                  >
+                    <LogOut className="size-4" aria-hidden />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("signOut")}</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
       </aside>
@@ -134,14 +138,17 @@ export function AppShell({
             </div>
             <span className="font-semibold">{tApp("name")}</span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={logout}
-            aria-label={t("signOut")}
-          >
-            <LogOut className="size-4" aria-hidden />
-          </Button>
+          <div className="flex items-center gap-0.5">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={logout}
+              aria-label={t("signOut")}
+            >
+              <LogOut className="size-4" aria-hidden />
+            </Button>
+          </div>
         </header>
 
         <main className="flex-1 pb-24 md:pb-8">{children}</main>
